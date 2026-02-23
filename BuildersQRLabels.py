@@ -47,13 +47,44 @@ from reportlab.pdfgen.canvas import Canvas as PDFCanvas
 from reportlab.graphics import renderPDF
 from svglib.svglib import svg2rlg
 
-# ── Logging (basic config — Phase 7 adds file handler from DB settings) ───────
+# ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[logging.StreamHandler()],
 )
 log = logging.getLogger(__name__)
+
+_log_file_handler: Optional[logging.FileHandler] = None
+
+
+def configure_log_file(path: str) -> None:
+    """
+    Attach (or re-attach) a FileHandler to the root logger using *path*.
+    Safe to call multiple times — the previous file handler is removed first.
+    Does nothing if *path* is empty or the file cannot be opened.
+    """
+    global _log_file_handler
+    root_logger = logging.getLogger()
+
+    if _log_file_handler is not None:
+        root_logger.removeHandler(_log_file_handler)
+        _log_file_handler.close()
+        _log_file_handler = None
+
+    if not path:
+        return
+
+    try:
+        handler = logging.FileHandler(path, encoding="utf-8")
+        handler.setFormatter(logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+        ))
+        root_logger.addHandler(handler)
+        _log_file_handler = handler
+        log.info("Log file: %s", path)
+    except OSError:
+        log.warning("Cannot open log file: %s", path)
 
 # ── Module-level constants ────────────────────────────────────────────────────
 CONFIG_FILE = "config.json"
@@ -1484,6 +1515,9 @@ class BuildersQRLabelsApp:
         self._engine  = StickerEngine(self._config)
         self._init_cloud()
 
+        # Attach file log handler using path from shared DB settings
+        configure_log_file(self._db.get_setting("log_path"))
+
         # ── Application state ─────────────────────────────────────────────────
         self._jobs: list[JobInfo] = []      # full list from last scan
         self._last_scan: str = ""
@@ -1775,6 +1809,8 @@ class BuildersQRLabelsApp:
         dlg.wait()
         # Reinitialise cloud provider in case the user switched providers
         self._init_cloud()
+        # Reattach log file in case the path changed
+        configure_log_file(self._db.get_setting("log_path"))
         # Reschedule refresh with potentially updated interval
         if self._refresh_id:
             self.root.after_cancel(self._refresh_id)
