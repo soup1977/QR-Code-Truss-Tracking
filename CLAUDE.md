@@ -1,4 +1,4 @@
-# CLAUDE.md — Tindell's Connect
+# CLAUDE.md — Builders Connect
 
 This file provides essential context for Claude Code when working on this project.
 Read it fully before making any changes.
@@ -7,7 +7,7 @@ Read it fully before making any changes.
 
 ## Project Overview
 
-**Tindell's Connect** is a Windows desktop application for Tindell's Inc., a truss
+**Builders Connect** is a Windows desktop application for Builders Inc., a truss
 manufacturing company. It manages the full job workflow:
 
 1. **Validate** job folders for required files
@@ -174,7 +174,7 @@ Each sticker page is **100mm × 30mm**:
 │                                                             │
 │  [Cloud QR]         [TRUSS CODE (large)]      [Token QR]  │
 │                                                             │
-│  JOBSITE PACKAGE    Tindell's Inc. — Address   USE ONLY    │
+│  JOBSITE PACKAGE    Builders Inc. — Address   USE ONLY    │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -228,7 +228,7 @@ All user settings live in `config.json` — **never hardcode credentials**.
   "onedrive_tenant_id": "common",
   "watch_folder": "",
   "target_folder": "",
-  "company_name": "Tindell's Inc.",
+  "company_name": "Builders Inc.",
   "company_address": "2644 Byington Solway Rd, Knoxville"
 }
 ```

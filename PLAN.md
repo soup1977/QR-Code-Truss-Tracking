@@ -1,4 +1,4 @@
-# Tindell's Connect — Implementation Plan
+# Builders Connect — Implementation Plan
 
 ## Decisions Made
 
@@ -95,7 +95,7 @@ An IT administrator must register an application in **Microsoft Entra ID** (form
 Azure Active Directory) at `https://portal.azure.com`:
 
 - Go to: **Entra ID → App registrations → New registration**
-- Name: `Tindell's Connect` (or any name)
+- Name: `Builders Connect` (or any name)
 - Supported account types: `Accounts in this organizational directory only`
 - No redirect URI needed (we use device code flow)
 
@@ -417,7 +417,7 @@ only re-renders rows that actually changed, to avoid flicker.
 │  ╚════════════════════════════════════════════════════════╝  │
 │                                                              │
 │  ╔═ Company ══════════════════════════════════════════════╗  │
-│  ║  Name:    [Tindell's Inc._____________________]        ║  │
+│  ║  Name:    [Builders Inc._____________________]        ║  │
 │  ║  Address: [2644 Byington Solway Rd, Knoxville_]        ║  │
 │  ╚════════════════════════════════════════════════════════╝  │
 │                                                              │
