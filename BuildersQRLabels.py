@@ -27,7 +27,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 # ── Tkinter (UI — Phase 3) ────────────────────────────────────────────────────
 import tkinter as tk
@@ -1511,6 +1511,14 @@ class StickerEngine:
         return recovered
 
 
+def _center_window(win: Union[tk.Tk, tk.Toplevel], w: int, h: int) -> None:
+    """Position *win* at the center of the primary screen."""
+    win.update_idletasks()
+    x = (win.winfo_screenwidth()  - w) // 2
+    y = (win.winfo_screenheight() - h) // 2
+    win.geometry(f"{w}x{h}+{x}+{y}")
+
+
 # ════════════════════════════════════════════════════════════════════════════════
 # BuildersQRLabelsApp — main Tkinter UI (Phase 3)
 # ════════════════════════════════════════════════════════════════════════════════
@@ -1553,8 +1561,8 @@ class BuildersQRLabelsApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title(f"Builders Connect — QR Labels  v{__version__}")
-        self.root.geometry("700x650")
         self.root.minsize(600, 450)
+        _center_window(self.root, 700, 650)
 
         # ── Backend objects ───────────────────────────────────────────────────
         self._config  = AppConfig()
@@ -2314,7 +2322,7 @@ class BuildersQRLabelsApp:
     def _show_error_log(self) -> None:
         win = tk.Toplevel(self.root)
         win.title("Error Log")
-        win.geometry("620x420")
+        _center_window(win, 620, 420)
         win.transient(self.root)
         txt = scrolledtext.ScrolledText(win, state="normal", wrap=tk.WORD,
                                          font=("Courier", 9))
@@ -2365,7 +2373,7 @@ class SettingsDialog:
 
         self._top = tk.Toplevel(parent)
         self._top.title("Settings")
-        self._top.geometry("520x520")
+        _center_window(self._top, 520, 520)
         self._top.resizable(False, True)
         self._top.grab_set()
         self._top.focus_set()
@@ -2705,7 +2713,7 @@ class SettingsDialog:
         # Instructions window with the device code displayed prominently
         code_win = tk.Toplevel(self._top)
         code_win.title("OneDrive \u2014 Sign In")
-        code_win.geometry("430x210")
+        _center_window(code_win, 430, 210)
         code_win.grab_set()
 
         tk.Label(
@@ -2771,7 +2779,7 @@ class SettingsDialog:
         """Show a small modal dialog with one text entry; return value or None."""
         dlg = tk.Toplevel(self._top)
         dlg.title(title)
-        dlg.geometry("420x160")
+        _center_window(dlg, 420, 160)
         dlg.grab_set()
         tk.Label(dlg, text=prompt, justify=tk.LEFT,
                  wraplength=390, padx=12, pady=10).pack(anchor="w")
