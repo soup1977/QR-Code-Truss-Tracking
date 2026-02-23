@@ -567,7 +567,7 @@ Job numbers follow `XXXXXX-XXX` format (e.g. `208135-001`).
 
 ---
 
-## Phase 9 — Network/Shared State (Detail)
+## Phase 9 — Network/Shared State + Documentation ✓
 
 ### How multiple users stay in sync
 
@@ -602,23 +602,26 @@ No server process is needed — just a file on a network share.
 4. All other users only need to set DB Path; they immediately inherit the shared folder paths
 5. The app creates the DB file and tables automatically on first run
 
+See **[docs/SETUP.md](docs/SETUP.md)** for the full installation, network, and cloud provider setup guide.
+See **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)** for the end-user how-to.
+
 ---
 
 ## Implementation Order
 
 ```
-Phase 1   Setup (requirements.txt, .gitignore, legacy/ folder)
-Phase 2   Core classes (AppConfig, JobDatabase, CloudProvider, JobManager, StickerEngine)
-Phase 3   Main UI (wire up classes, fully functional single-view app)
-Phase 4   Settings dialog (replace hardcoded credentials)
-Phase 5   Cloud providers (Dropbox port, OneDrive new)
-Phase 6   QR utility function
-Phase 7   Logging (replace all print() calls)
-Phase 8   Polish (scrollbar, keyboard shortcuts, error log viewer)
-Phase 9   Network DB documentation + setup guide
+Phase 1 ✓  Setup (requirements.txt, .gitignore, legacy/ folder)
+Phase 2 ✓  Core classes (AppConfig, JobDatabase, CloudProvider, JobManager, StickerEngine)
+Phase 3 ✓  Main UI (wire up classes, fully functional single-view app)
+Phase 4 ✓  Settings dialog (replace hardcoded credentials)
+Phase 5 ✓  Cloud providers (Dropbox port, OneDrive new)
+Phase 6 ✓  QR utility function (folded into Phase 5)
+Phase 7 ✓  Logging (configure_log_file with dynamic FileHandler)
+Phase 8 ✓  Polish (scrollbar, keyboard shortcuts, error log viewer, job ID format)
+Phase 9 ✓  Network DB documentation + user guide (docs/SETUP.md, docs/USER_GUIDE.md)
 ```
 
-Each phase gets its own commit with a clear message.
+All phases complete. Each phase has its own git commit on a feature branch, merged into `main`.
 
 ---
 
