@@ -326,7 +326,7 @@ Key fixes vs. legacy:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│ [Select Folder] [Watch Folder] [Validate] [Generate] [Upload] [Sync All] [⚙ Settings] │
+│ [Jobs Folder] [Watch Folder] [Validate] [Generate] [Upload] [Sync All] [⚙ Settings] │
 ├────────────────────────────────────────────────────────────────────────┤
 │ [Search...                                              ] [🔍] [✕]      │
 ├────────────────────────────────────────────────────────────────────────┤
@@ -345,7 +345,7 @@ Key fixes vs. legacy:
 
 | Button | Action |
 |---|---|
-| Select Folder | Set Target/Jobs folder (Sticker Engine source) |
+| Jobs Folder | Set Local Jobsite Package Folder (Sticker Engine source + upload source) |
 | Watch Folder | Set Watch folder (Cloud Manager upload source) |
 | Validate | Scan all folders + cloud; refresh treeview + DB |
 | Generate | Generate stickers for selected pending jobs |
@@ -443,7 +443,7 @@ only re-renders rows that actually changed, to avoid flicker.
 │  ║                   Status: ● Connected (12 jobs)        ║  │
 │  ║                                                        ║  │
 │  ║  Watch Folder:  [\\SERVER\Jobs\Watch___________] [Browse] ║  │
-│  ║  Target Folder: [\\SERVER\Jobs\Target__________] [Browse] ║  │
+│  ║  Local Jobsite Package Folder: [\\SERVER\Jobs\LocalFinals] [Browse] ║  │
 │  ║  Log Path:      [\\SERVER\BuildersQRLabels\bql.log] [Browse] ║  │
 │  ║  ─ These are shared: saved to database, all machines ─ ║  │
 │  ╚════════════════════════════════════════════════════════╝  │
@@ -584,7 +584,7 @@ User A (generates stickers)            User B (uploads to cloud)
                                       and update UI
 ```
 
-1. Admin opens Settings → sets Watch Folder + Target Folder → `JobDatabase.set_setting()` writes to DB
+1. Admin opens Settings → sets Watch Folder + Local Jobsite Package Folder → `JobDatabase.set_setting()` writes to DB
 2. All other clients auto-refresh → read `watch_folder` / `target_folder` from DB → use the correct paths with no manual setup
 3. User A generates stickers → `JobDatabase.upsert_job()` writes sticker_status=Completed
 4. User B's auto-refresh fires → reads DB → sees job is now Completed → updates their treeview
@@ -598,7 +598,7 @@ No server process is needed — just a file on a network share.
 1. Create a shared folder: `\\SERVER\BuildersQRLabels\`
 2. Give all users Read+Write access to that folder
 3. One user (admin) opens Settings → sets DB Path to `\\SERVER\BuildersQRLabels\builders_qr_labels.db`,
-   then sets Watch Folder, Target Folder, and Log Path — these are saved to the shared DB
+   then sets Watch Folder, Local Jobsite Package Folder, and Log Path — these are saved to the shared DB
 4. All other users only need to set DB Path; they immediately inherit the shared folder paths
 5. The app creates the DB file and tables automatically on first run
 

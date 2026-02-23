@@ -43,7 +43,7 @@ network setup for Builders Connect.
 On first launch, the app creates a local `builders_qr_labels.db` and an empty
 `config.json` in the app folder.
 
-1. Click **Select Folder** → choose the folder where job subfolders live
+1. Click **Jobs Folder** → choose the Local Jobsite Package Folder where job subfolders live
 2. Click **Watch Folder** → choose the folder where incoming packages arrive
 3. Open **⚙ Settings** → configure your cloud provider (see [Cloud Provider Setup](#cloud-provider-setup))
 4. Click **Validate** to scan
@@ -75,11 +75,11 @@ Give every user account **Read + Write** access to this folder.
    \\SERVER\BuildersQRLabels\builders_qr_labels.db
    ```
    Click the status indicator — it should show **Connected**.
-3. Set **Watch Folder**, **Target Folder**, and **Log Path**:
+3. Set **Watch Folder**, **Local Jobsite Package Folder**, and **Log Path**:
    ```
-   Watch Folder:  \\SERVER\Jobs\Watch
-   Target Folder: \\SERVER\Jobs\Target
-   Log Path:      \\SERVER\BuildersQRLabels\builders_qr_labels.log
+   Watch Folder:                  \\SERVER\Jobs\Watch
+   Local Jobsite Package Folder:  \\SERVER\Jobs\LocalFinals
+   Log Path:                      \\SERVER\BuildersQRLabels\builders_qr_labels.log
    ```
 4. Click **Save**
 
@@ -95,8 +95,8 @@ pick them up automatically.
    ```
 3. Click **Save**
 
-Watch Folder, Target Folder, and Log Path are read from the shared database —
-no manual entry needed.
+Watch Folder, Local Jobsite Package Folder, and Log Path are read from the
+shared database — no manual entry needed.
 
 ### How sync works
 
@@ -190,7 +190,7 @@ contains credentials.
 | `onedrive_tenant_id` | Azure tenant ID, or `"common"` for any Microsoft account |
 | `company_name` / `company_address` | Printed on every sticker |
 
-Shared settings (Watch Folder, Target Folder, auto-refresh interval, log path)
+Shared settings (Watch Folder, Local Jobsite Package Folder, auto-refresh interval, log path)
 are stored in the database `settings` table, not here.
 
 ---
@@ -211,12 +211,12 @@ These files are auto-generated and should be **gitignored** (they already are):
 
 ## Folder Structure Requirements
 
-### Target / Jobs Folder
+### Local Jobsite Package Folder
 
 Each job lives in a subfolder named exactly `XXXXXX-XXX` (6 digits, hyphen, 3 digits):
 
 ```
-Target Folder\
+Local Jobsite Package Folder\
 └── 208135-001\
     ├── 208135-001.csv                   ← required; jobnumber column = "208135-001"
     ├── 208135-001_QR.svg                ← generated after first upload
@@ -246,7 +246,7 @@ from cloud uploads.
 
 | Symptom | Check |
 |---|---|
-| Job list is empty | Verify Target Folder is set and contains `XXXXXX-XXX` subfolders |
+| Job list is empty | Verify Local Jobsite Package Folder is set and contains `XXXXXX-XXX` subfolders |
 | "No rows for job X found in CSV" | Confirm the `jobnumber` column in the CSV matches the folder name exactly (e.g. `208135-001`) |
 | Cloud status stuck at Pending | Verify cloud provider is authenticated in Settings |
 | DB Path shows "Unavailable" | Confirm the network share is reachable and the path is correct |

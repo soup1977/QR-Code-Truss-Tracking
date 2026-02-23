@@ -1597,7 +1597,7 @@ class BuildersQRLabelsApp:
         btn: dict[str, Any] = dict(relief=tk.FLAT, bg="#ececec", padx=6, pady=3,
                                    activebackground="#d0d0d0", cursor="hand2")
         left_buttons = [
-            ("Select Folder", self._on_select_folder),
+            ("Jobs Folder",   self._on_select_folder),
             ("Watch Folder",  self._on_watch_folder),
             ("Validate",      self._on_validate),
             ("Generate",      self._on_generate),
@@ -1728,7 +1728,7 @@ class BuildersQRLabelsApp:
     def _on_select_folder(self) -> None:
         current = self._db.get_setting("target_folder")
         folder = filedialog.askdirectory(
-            title="Select Target / Jobs Folder",
+            title="Select Local Jobsite Package Folder",
             initialdir=current or os.path.expanduser("~"),
         )
         if folder:
@@ -1793,7 +1793,7 @@ class BuildersQRLabelsApp:
 
     def _on_sync_all(self) -> None:
         if not self._db.get_setting("target_folder"):
-            messagebox.showwarning("Sync All", "Target folder is not configured.")
+            messagebox.showwarning("Sync All", "Local Jobsite Package Folder is not configured.")
             return
         to_generate = [j.job_id for j in self._jobs if j.sticker_status == "Pending"]
         to_upload = (
@@ -1984,7 +1984,7 @@ class BuildersQRLabelsApp:
     def _open_job_folder(self, job_id: str) -> None:
         target = self._db.get_setting("target_folder")
         if not target:
-            messagebox.showwarning("Open Folder", "Target folder not configured.")
+            messagebox.showwarning("Open Folder", "Local Jobsite Package Folder not configured.")
             return
         path = os.path.join(target, job_id)
         if os.path.isdir(path):
@@ -2047,7 +2047,7 @@ class BuildersQRLabelsApp:
         target = self._db.get_setting("target_folder")
         if not target:
             self._ui(messagebox.showwarning, "Generate",
-                     "Target folder is not configured.")
+                     "Local Jobsite Package Folder is not configured.")
             return
 
         success, errors = 0, []
@@ -2391,7 +2391,7 @@ class SettingsDialog:
         folders_lf.pack(fill=tk.X, pady=(0, 8))
         self._add_browse_entry(folders_lf, "Watch Folder:",  self._watch_var,  row=0,
                                browse_fn=self._browse_dir)
-        self._add_browse_entry(folders_lf, "Target Folder:", self._target_var, row=1,
+        self._add_browse_entry(folders_lf, "Local Jobsite Package Folder:", self._target_var, row=1,
                                browse_fn=self._browse_dir)
         self._add_browse_entry(folders_lf, "Log Path:",      self._log_var,    row=2,
                                browse_fn=self._browse_log)
