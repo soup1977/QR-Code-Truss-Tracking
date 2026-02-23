@@ -20,6 +20,14 @@ being merged into a single unified application.
 
 ---
 
+## Developer Environment
+
+- **Developer**: Craig
+- **Local repo path**: `C:\Users\craig\source\repos\QR-Code-Truss-Tracking`
+- **Projects root**: `C:\Users\craig\source\repos`
+
+---
+
 ## Target Environment
 
 - **OS**: Windows only (`os.startfile`, `win32print`, Windows path conventions)
