@@ -23,7 +23,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 # ── Tkinter (UI — Phase 3) ────────────────────────────────────────────────────
 import tkinter as tk
@@ -37,6 +37,7 @@ from dropbox.sharing import RequestedVisibility, SharedLinkSettings
 import msal
 import pandas as pd
 import qrcode
+from qrcode.constants import ERROR_CORRECT_L
 from qrcode.image.svg import SvgPathImage
 import requests
 from reportlab.lib.units import mm
@@ -558,10 +559,13 @@ class OneDriveProvider(CloudProvider):
             logging.exception("MSAL app init failed")
 
     def _save_token_cache(self) -> None:
-        if self._msal_app and self._msal_app.token_cache.has_state_changed:
+        cache = self._msal_app.token_cache if self._msal_app else None
+        if not isinstance(cache, msal.SerializableTokenCache):
+            return
+        if cache.has_state_changed:
             try:
                 with open(self._token_file, "w", encoding="utf-8") as fh:
-                    fh.write(self._msal_app.token_cache.serialize())
+                    fh.write(cache.serialize())
             except Exception:
                 logging.exception("Failed to save OneDrive token cache")
 
@@ -592,6 +596,8 @@ class OneDriveProvider(CloudProvider):
         """Poll MSAL until device-code auth completes. Call after start_device_code_flow()."""
         if not self._device_flow:
             raise RuntimeError("Call start_device_code_flow() before authenticate().")
+        if not self._msal_app:
+            return False
         try:
             result = self._msal_app.acquire_token_by_device_flow(self._device_flow)
             if "access_token" in result:
@@ -1018,7 +1024,7 @@ class StickerEngine:
         try:
             qr = qrcode.QRCode(
                 version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                error_correction=ERROR_CORRECT_L,
                 box_size=10,
                 border=1,
             )
@@ -1027,7 +1033,8 @@ class StickerEngine:
             img = qr.make_image(fill_color="black", back_color="white")
             fd, tmp_png = tempfile.mkstemp(suffix=".png")
             os.close(fd)
-            img.save(tmp_png)
+            with open(tmp_png, "wb") as _f:
+                img.save(_f)
             c.drawImage(tmp_png, right_qr_x, right_qr_y,
                         width=qs, height=qs, mask="auto")
         except Exception:
@@ -1282,8 +1289,8 @@ class BuildersQRLabelsApp:
         self._setup_banner(banner)
 
     def _setup_toolbar(self, parent: tk.Frame) -> None:
-        btn = dict(relief=tk.FLAT, bg="#ececec", padx=6, pady=3,
-                   activebackground="#d0d0d0", cursor="hand2")
+        btn: dict[str, Any] = dict(relief=tk.FLAT, bg="#ececec", padx=6, pady=3,
+                                   activebackground="#d0d0d0", cursor="hand2")
         left_buttons = [
             ("Select Folder", self._on_select_folder),
             ("Watch Folder",  self._on_watch_folder),
