@@ -18,7 +18,9 @@ import socket
 import sqlite3
 import tempfile
 import threading
+import time
 import uuid
+import webbrowser
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -410,17 +412,14 @@ class CloudProvider(ABC):
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-# DropboxProvider — Phase 2: auth wiring; Phase 5: full upload/download logic
+# DropboxProvider
 # ════════════════════════════════════════════════════════════════════════════════
 
 class DropboxProvider(CloudProvider):
-    """
-    Dropbox implementation.
-    Auth is fully wired here (needed by Settings dialog in Phase 4).
-    Upload / download / list methods are stubbed — implemented in Phase 5.
-    """
+    """Dropbox implementation via the Dropbox Python SDK."""
 
-    _CACHE_TTL = 5  # seconds for job-list cache
+    _CACHE_TTL = 5                       # seconds for job-list cache
+    _CHUNK_SIZE = 150 * 1024 * 1024     # bytes — threshold for chunked upload session
 
     def __init__(self, config: AppConfig) -> None:
         self._config = config
@@ -495,36 +494,148 @@ class DropboxProvider(CloudProvider):
         except Exception:
             return False
 
-    # ── Cloud operations (Phase 5) ────────────────────────────────────────────
+    # ── Cloud operations ──────────────────────────────────────────────────────
 
     def list_jobs(self) -> dict[str, str]:
-        raise NotImplementedError("Phase 5: DropboxProvider.list_jobs")
+        """Return {job_id: cloud_folder_path} for all 7-digit job folders.  TTL-cached."""
+        if not self._dbx:
+            raise RuntimeError("Not authenticated with Dropbox.")
+        now = time.time()
+        if self._jobs_cache is not None and (now - self._jobs_cache_time) < self._CACHE_TTL:
+            return self._jobs_cache
+        jobs: dict[str, str] = {}
+        try:
+            res = self._dbx.files_list_folder(DROPBOX_UPLOAD_ROOT)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to list Dropbox jobs folder: {exc}") from exc
+        def _process(entries: list) -> None:
+            for ent in entries:
+                if isinstance(ent, dropbox.files.FolderMetadata):
+                    name = ent.name.strip()
+                    if JOB_ID_RE.match(name):
+                        jobs[name] = f"{DROPBOX_UPLOAD_ROOT}/{name}"
+        _process(res.entries)
+        while res.has_more:
+            res = self._dbx.files_list_folder_continue(res.cursor)
+            _process(res.entries)
+        self._jobs_cache = jobs
+        self._jobs_cache_time = now
+        return jobs
 
     def ensure_folder(self, job_id: str) -> str:
-        raise NotImplementedError("Phase 5: DropboxProvider.ensure_folder")
+        """Return the cloud folder path, creating it if it does not exist."""
+        if not self._dbx:
+            raise RuntimeError("Not authenticated with Dropbox.")
+        folder_path = f"{DROPBOX_UPLOAD_ROOT}/{job_id}"
+        try:
+            md = self._dbx.files_get_metadata(folder_path)
+            if isinstance(md, dropbox.files.FolderMetadata):
+                return folder_path
+        except Exception:
+            pass
+        try:
+            self._dbx.files_create_folder_v2(folder_path)
+        except Exception as exc:
+            raise RuntimeError(f"Cannot create Dropbox folder for job {job_id}: {exc}") from exc
+        self._jobs_cache = None  # invalidate cache
+        return folder_path
 
     def upload_file(self, local_path: str, cloud_folder: str) -> None:
-        raise NotImplementedError("Phase 5: DropboxProvider.upload_file")
+        """Upload a single file.  Uses a chunked session for files > _CHUNK_SIZE."""
+        if not self._dbx:
+            raise RuntimeError("Not authenticated with Dropbox.")
+        dest = f"{cloud_folder}/{os.path.basename(local_path)}"
+        file_size = os.path.getsize(local_path)
+        try:
+            if file_size <= self._CHUNK_SIZE:
+                with open(local_path, "rb") as fh:
+                    self._dbx.files_upload(fh.read(), dest, mode=WriteMode("overwrite"))
+            else:
+                with open(local_path, "rb") as fh:
+                    session = self._dbx.files_upload_session_start(fh.read(self._CHUNK_SIZE))
+                    offset = self._CHUNK_SIZE
+                    while offset < file_size:
+                        cursor = dropbox.files.UploadSessionCursor(
+                            session_id=session.session_id, offset=offset
+                        )
+                        chunk = fh.read(self._CHUNK_SIZE)
+                        if offset + len(chunk) >= file_size:
+                            commit = dropbox.files.CommitInfo(
+                                path=dest, mode=WriteMode("overwrite")
+                            )
+                            self._dbx.files_upload_session_finish(chunk, cursor, commit)
+                        else:
+                            self._dbx.files_upload_session_append_v2(chunk, cursor)
+                        offset += len(chunk)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Dropbox upload failed for {os.path.basename(local_path)}: {exc}"
+            ) from exc
+        log.info("Uploaded %s → %s", local_path, dest)
 
     def download_file(self, cloud_path: str, local_path: str) -> None:
-        raise NotImplementedError("Phase 5: DropboxProvider.download_file")
+        """Download a single file from Dropbox to local_path."""
+        if not self._dbx:
+            raise RuntimeError("Not authenticated with Dropbox.")
+        try:
+            _, res = self._dbx.files_download(cloud_path)
+            parent = os.path.dirname(local_path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            with open(local_path, "wb") as fh:
+                fh.write(res.content)
+        except Exception as exc:
+            raise RuntimeError(f"Dropbox download failed for {cloud_path}: {exc}") from exc
+        log.info("Downloaded %s → %s", cloud_path, local_path)
 
     def create_share_link(self, cloud_folder: str) -> str:
-        raise NotImplementedError("Phase 5: DropboxProvider.create_share_link")
+        """Return an existing public link or create a new one for the folder."""
+        if not self._dbx:
+            raise RuntimeError("Not authenticated with Dropbox.")
+        try:
+            links = self._dbx.sharing_list_shared_links(
+                path=cloud_folder, direct_only=True
+            ).links
+            if links:
+                return links[0].url
+        except Exception:
+            pass
+        try:
+            settings = SharedLinkSettings(requested_visibility=RequestedVisibility.public)
+            link = self._dbx.sharing_create_shared_link_with_settings(cloud_folder, settings)
+            return link.url
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to create Dropbox share link for {cloud_folder}: {exc}"
+            ) from exc
 
     def list_folder_files(self, cloud_folder: str) -> list[str]:
-        raise NotImplementedError("Phase 5: DropboxProvider.list_folder_files")
+        """Return filenames of all files (not folders) in the cloud folder."""
+        if not self._dbx:
+            raise RuntimeError("Not authenticated with Dropbox.")
+        files: list[str] = []
+        try:
+            res = self._dbx.files_list_folder(cloud_folder)
+            while True:
+                for ent in res.entries:
+                    if isinstance(ent, dropbox.files.FileMetadata):
+                        files.append(ent.name)
+                if not res.has_more:
+                    break
+                res = self._dbx.files_list_folder_continue(res.cursor)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to list Dropbox folder {cloud_folder}: {exc}"
+            ) from exc
+        return files
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-# OneDriveProvider — Phase 2: auth wiring; Phase 5: full upload/download logic
+# OneDriveProvider
 # ════════════════════════════════════════════════════════════════════════════════
 
 class OneDriveProvider(CloudProvider):
-    """
-    Microsoft OneDrive via Graph API + MSAL device-code flow.
-    Auth is fully wired here.  Upload / download / list stubbed for Phase 5.
-    """
+    """Microsoft OneDrive implementation via Graph API + MSAL device-code flow."""
 
     SCOPES = ["Files.ReadWrite", "offline_access"]
     _AUTHORITY_TEMPLATE = "https://login.microsoftonline.com/{tenant}"
@@ -616,25 +727,115 @@ class OneDriveProvider(CloudProvider):
         except Exception:
             return False
 
-    # ── Cloud operations (Phase 5) ────────────────────────────────────────────
+    # ── Graph API helper ──────────────────────────────────────────────────────
+
+    def _graph_request(self, method: str, endpoint: str, **kwargs: Any) -> requests.Response:
+        """Make an authenticated request to GRAPH_BASE + endpoint."""
+        token = self._get_access_token()
+        if not token:
+            raise RuntimeError("Not authenticated with OneDrive.")
+        headers: dict[str, str] = kwargs.pop("headers", {})
+        headers["Authorization"] = f"Bearer {token}"
+        resp = requests.request(method, f"{GRAPH_BASE}{endpoint}", headers=headers, **kwargs)
+        resp.raise_for_status()
+        return resp
+
+    # ── Cloud operations ──────────────────────────────────────────────────────
 
     def list_jobs(self) -> dict[str, str]:
-        raise NotImplementedError("Phase 5: OneDriveProvider.list_jobs")
+        """Return {job_id: cloud_folder_path} for all 7-digit job folders."""
+        try:
+            resp = self._graph_request("GET", "/root:/Cloud Manager Uploads:/children")
+            jobs: dict[str, str] = {}
+            for item in resp.json().get("value", []):
+                name = item.get("name", "").strip()
+                if JOB_ID_RE.match(name) and "folder" in item:
+                    jobs[name] = f"/Cloud Manager Uploads/{name}"
+            return jobs
+        except Exception as exc:
+            raise RuntimeError(f"Failed to list OneDrive jobs: {exc}") from exc
 
     def ensure_folder(self, job_id: str) -> str:
-        raise NotImplementedError("Phase 5: OneDriveProvider.ensure_folder")
+        """Return the cloud folder path, creating it if it does not exist."""
+        folder_path = f"/Cloud Manager Uploads/{job_id}"
+        try:
+            self._graph_request("GET", f"/root:{folder_path}:")
+            return folder_path
+        except requests.HTTPError as exc:
+            if exc.response is None or exc.response.status_code != 404:
+                raise RuntimeError(
+                    f"Error checking OneDrive folder for job {job_id}: {exc}"
+                ) from exc
+        try:
+            self._graph_request(
+                "POST",
+                "/root:/Cloud Manager Uploads:/children",
+                json={"name": job_id, "folder": {}, "@microsoft.graph.conflictBehavior": "fail"},
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                f"Cannot create OneDrive folder for job {job_id}: {exc}"
+            ) from exc
+        return folder_path
 
     def upload_file(self, local_path: str, cloud_folder: str) -> None:
-        raise NotImplementedError("Phase 5: OneDriveProvider.upload_file")
+        """Upload a single file via Graph API PUT (≤ 250 MB per request)."""
+        filename = os.path.basename(local_path)
+        try:
+            with open(local_path, "rb") as fh:
+                data = fh.read()
+            self._graph_request(
+                "PUT",
+                f"/root:{cloud_folder}/{filename}:/content",
+                data=data,
+                headers={"Content-Type": "application/octet-stream"},
+            )
+        except Exception as exc:
+            raise RuntimeError(f"OneDrive upload failed for {filename}: {exc}") from exc
+        log.info("Uploaded %s → OneDrive%s/%s", local_path, cloud_folder, filename)
 
     def download_file(self, cloud_path: str, local_path: str) -> None:
-        raise NotImplementedError("Phase 5: OneDriveProvider.download_file")
+        """Download a single file from OneDrive to local_path."""
+        try:
+            resp = self._graph_request("GET", f"/root:{cloud_path}:/content")
+            parent = os.path.dirname(local_path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            with open(local_path, "wb") as fh:
+                fh.write(resp.content)
+        except Exception as exc:
+            raise RuntimeError(f"OneDrive download failed for {cloud_path}: {exc}") from exc
+        log.info("Downloaded OneDrive%s → %s", cloud_path, local_path)
 
     def create_share_link(self, cloud_folder: str) -> str:
-        raise NotImplementedError("Phase 5: OneDriveProvider.create_share_link")
+        """Create an anonymous view link for the folder and return its URL."""
+        try:
+            item_resp = self._graph_request("GET", f"/root:{cloud_folder}:")
+            item_id = item_resp.json()["id"]
+            link_resp = self._graph_request(
+                "POST",
+                f"/items/{item_id}/createLink",
+                json={"type": "view", "scope": "anonymous"},
+            )
+            return link_resp.json()["link"]["webUrl"]
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to create OneDrive share link for {cloud_folder}: {exc}"
+            ) from exc
 
     def list_folder_files(self, cloud_folder: str) -> list[str]:
-        raise NotImplementedError("Phase 5: OneDriveProvider.list_folder_files")
+        """Return filenames of all files (not folders) in the cloud folder."""
+        try:
+            resp = self._graph_request("GET", f"/root:{cloud_folder}:/children")
+            return [
+                item["name"]
+                for item in resp.json().get("value", [])
+                if "file" in item
+            ]
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to list OneDrive folder {cloud_folder}: {exc}"
+            ) from exc
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -690,8 +891,6 @@ class JobManager:
         if self._cloud and self._cloud.is_authenticated():
             try:
                 cloud_jobs = self._cloud.list_jobs()
-            except NotImplementedError:
-                pass  # Phase 5 not yet implemented
             except Exception:
                 logging.exception("Cloud job list failed")
 
@@ -823,6 +1022,64 @@ class JobManager:
                         if JOB_ID_RE.match(stem) and stem not in found:
                             found.append(stem)
         return found
+
+    # ── Cloud upload / download ───────────────────────────────────────────────
+
+    def upload_job(self, job_id: str, cloud: CloudProvider) -> str:
+        """
+        Upload all valid files from the target job folder to cloud.
+        Generates a share QR SVG after upload and uploads it too.
+        Returns the public share URL.
+        """
+        target = self.target_folder
+        if not target:
+            raise RuntimeError("Target folder is not configured.")
+        job_folder = os.path.join(target, job_id)
+        if not os.path.isdir(job_folder):
+            raise RuntimeError(f"Local job folder not found: {job_folder}")
+
+        cloud_folder = cloud.ensure_folder(job_id)
+
+        for fname in os.listdir(job_folder):
+            if re.match(rf"{re.escape(job_id)}_JOB_", fname, flags=re.IGNORECASE):
+                continue
+            fpath = os.path.join(job_folder, fname)
+            if os.path.isfile(fpath):
+                log.info("Uploading %s for job %s", fname, job_id)
+                cloud.upload_file(fpath, cloud_folder)
+
+        share_url = cloud.create_share_link(cloud_folder)
+
+        # Generate the QR SVG from the share URL and upload it
+        qr_path = os.path.join(job_folder, f"{job_id}{QR_SUFFIX}")
+        generate_share_qr(share_url, qr_path)
+        cloud.upload_file(qr_path, cloud_folder)
+
+        log.info("Job %s uploaded. Share URL: %s", job_id, share_url)
+        return share_url
+
+    def download_job(self, job_id: str, cloud: CloudProvider, cloud_folder: str) -> None:
+        """
+        Download CSV, PDF, SVG, and TXT files for job_id from cloud to the
+        target folder.  Skips _JOB_* files.
+        """
+        target = self.target_folder
+        if not target:
+            raise RuntimeError("Target folder is not configured.")
+        job_folder = os.path.join(target, job_id)
+        os.makedirs(job_folder, exist_ok=True)
+
+        for fname in cloud.list_folder_files(cloud_folder):
+            if re.match(rf"{re.escape(job_id)}_JOB_", fname, flags=re.IGNORECASE):
+                continue
+            if fname.lower().endswith((".pdf", ".csv", ".svg", ".txt")):
+                cloud_path = f"{cloud_folder}/{fname}"
+                local_path = os.path.join(job_folder, fname)
+                log.info("Downloading %s for job %s", fname, job_id)
+                try:
+                    cloud.download_file(cloud_path, local_path)
+                except Exception:
+                    logging.exception("Failed to download %s", fname)
 
     @staticmethod
     def _read_qty_from_summary(path: str) -> Optional[int]:
@@ -1463,21 +1720,55 @@ class BuildersQRLabelsApp:
         self._run(self._generate_task, eligible)
 
     def _on_upload(self) -> None:
-        messagebox.showinfo("Upload to Cloud",
-                            "Cloud upload coming in Phase 5.")
+        if not self._cloud or not self._cloud.is_authenticated():
+            messagebox.showwarning("Upload",
+                                   "Cloud provider is not authenticated.\n"
+                                   "Open Settings to connect.")
+            return
+        selected = self._tree.selection()
+        if not selected:
+            messagebox.showinfo("Upload", "Select one or more jobs to upload.")
+            return
+        eligible = [
+            jid for jid in selected
+            if (j := self._job_by_id(jid))
+            and j.sticker_status == "Completed"
+            and j.cloud_status != "Uploaded"
+        ]
+        if not eligible:
+            messagebox.showinfo("Upload",
+                                "No eligible jobs in selection.\n"
+                                "Jobs must have Completed stickers and not already be Uploaded.")
+            return
+        self._mark_active(eligible)
+        self._run(self._upload_task, eligible)
 
     def _on_sync_all(self) -> None:
         if not self._db.get_setting("target_folder"):
             messagebox.showwarning("Sync All", "Target folder is not configured.")
             return
-        pending = [j.job_id for j in self._jobs if j.sticker_status == "Pending"]
-        if pending:
-            self._mark_active(pending)
-            self._run(self._generate_task, pending)
-        else:
+        to_generate = [j.job_id for j in self._jobs if j.sticker_status == "Pending"]
+        to_upload = (
+            [
+                j.job_id for j in self._jobs
+                if j.sticker_status == "Completed" and j.cloud_status != "Uploaded"
+            ]
+            if self._cloud and self._cloud.is_authenticated()
+            else []
+        )
+        if not to_generate and not to_upload:
+            messagebox.showinfo("Sync All", "All jobs are up to date.")
+            return
+        all_active = list(dict.fromkeys(to_generate + to_upload))
+        self._mark_active(all_active)
+        if to_generate:
+            self._run(self._generate_task, to_generate)
+        if to_upload:
+            self._run(self._upload_task, to_upload)
+        elif to_generate and not (self._cloud and self._cloud.is_authenticated()):
             messagebox.showinfo("Sync All",
-                                "No pending jobs to generate.\n"
-                                "(Cloud upload coming in Phase 5.)")
+                                f"{len(to_generate)} job(s) queued for generation.\n"
+                                "Cloud upload skipped — provider not authenticated.")
 
     def _on_settings(self) -> None:
         dlg = SettingsDialog(self.root, self._config, self._db)
@@ -1621,8 +1912,7 @@ class BuildersQRLabelsApp:
                              command=self._on_upload)
         if job.cloud_status == "Cloud Only":
             menu.add_command(label="Download from Cloud",
-                             command=lambda: messagebox.showinfo(
-                                 "Download", "Download coming in Phase 5."))
+                             command=lambda iid=iid: self._run(self._download_task, iid))
         menu.add_command(label="Open Cloud Link",
                          command=lambda: self._open_cloud_link(iid))
         menu.add_separator()
@@ -1657,8 +1947,16 @@ class BuildersQRLabelsApp:
                                    f"Folder not found:\n{path}")
 
     def _open_cloud_link(self, job_id: str) -> None:
-        messagebox.showinfo("Cloud Link",
-                            "Cloud share links available after Phase 5.")
+        job = self._job_by_id(job_id)
+        if not job or job.cloud_status not in ("Uploaded", "Cloud Only"):
+            messagebox.showinfo("Cloud Link", "This job has not been uploaded yet.")
+            return
+        if not self._cloud or not self._cloud.is_authenticated():
+            messagebox.showwarning("Cloud Link",
+                                   "Cloud provider is not authenticated.\n"
+                                   "Open Settings to connect.")
+            return
+        self._run(self._open_cloud_link_task, job_id)
 
     def _copy_job_id(self, job_id: str) -> None:
         self.root.clipboard_clear()
@@ -1753,6 +2051,78 @@ class BuildersQRLabelsApp:
                 self._ui(lambda j=_j: self._update_job_row(j))
         except Exception:
             logging.exception("Revalidate failed for %s", job_id)
+
+    def _upload_task(self, job_ids: list[str]) -> None:
+        if self._cloud is None:
+            self._ui(messagebox.showwarning, "Upload", "Cloud provider is not available.")
+            return
+        success, errors = 0, []
+        for job_id in job_ids:
+            try:
+                self._manager.upload_job(job_id, self._cloud)
+                job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
+                job.cloud_status   = "Uploaded"
+                job.cloud_progress = "100%"
+                job.last_updated   = datetime.now().isoformat(timespec="seconds")
+                self._db.upsert_job(job)
+                success += 1
+                _j = job
+                self._ui(lambda j=_j: self._update_job_row(j))
+            except Exception as exc:
+                logging.exception("Upload failed for %s", job_id)
+                self._session_errors += 1
+                errors.append(f"{job_id}: {exc}")
+                err_job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
+                err_job.cloud_status = "Error"
+                err_job.last_updated = datetime.now().isoformat(timespec="seconds")
+                self._db.upsert_job(err_job)
+                _ej = err_job
+                self._ui(lambda j=_ej: self._update_job_row(j))
+        self._ui(self._update_statusbar)
+        msg = f"Uploaded {success} job(s) successfully."
+        if errors:
+            msg += f"\n\nErrors ({len(errors)}):\n" + "\n".join(errors)
+            self._ui(messagebox.showwarning, "Upload Complete", msg)
+        else:
+            self._ui(messagebox.showinfo, "Upload Complete", msg)
+
+    def _download_task(self, job_id: str) -> None:
+        if self._cloud is None:
+            self._ui(messagebox.showwarning, "Download", "Cloud provider is not available.")
+            return
+        cloud_folder = f"{DROPBOX_UPLOAD_ROOT}/{job_id}"
+        try:
+            self._manager.download_job(job_id, self._cloud, cloud_folder)
+            status, qty = self._manager.classify_sticker_status(job_id)
+            job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
+            job.sticker_status = status
+            job.sticker_qty    = qty
+            job.cloud_status   = "Uploaded"
+            job.cloud_progress = "100%"
+            job.last_updated   = datetime.now().isoformat(timespec="seconds")
+            self._db.upsert_job(job)
+            _j = job
+            self._ui(lambda j=_j: self._update_job_row(j))
+            self._ui(messagebox.showinfo, "Download Complete",
+                     f"Job {job_id} downloaded successfully.")
+        except Exception as exc:
+            logging.exception("Download failed for %s", job_id)
+            self._session_errors += 1
+            self._ui(messagebox.showerror, "Download Error",
+                     f"Download failed for job {job_id}:\n{exc}")
+            self._ui(self._update_statusbar)
+
+    def _open_cloud_link_task(self, job_id: str) -> None:
+        if self._cloud is None:
+            return
+        cloud_folder = f"{DROPBOX_UPLOAD_ROOT}/{job_id}"
+        try:
+            url = self._cloud.create_share_link(cloud_folder)
+            self._ui(lambda u=url: webbrowser.open(u))
+        except Exception as exc:
+            logging.exception("Failed to get cloud link for %s", job_id)
+            self._ui(messagebox.showerror, "Cloud Link Error",
+                     f"Could not retrieve share link:\n{exc}")
 
     # ── Auto-refresh ──────────────────────────────────────────────────────────
 
