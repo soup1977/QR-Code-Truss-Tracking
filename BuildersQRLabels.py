@@ -93,7 +93,7 @@ TOKEN_ONEDRIVE_FILE = "token_onedrive.json"
 QR_SUFFIX = "_QR.svg"
 DROPBOX_UPLOAD_ROOT = "/Cloud Manager Uploads"
 WATCH_SUBDIR = "_Final Jobsite Package QR"
-JOB_ID_RE = re.compile(r"^\d{7}$")
+JOB_ID_RE = re.compile(r"^\d{6}-\d{3}$")
 GRAPH_BASE = "https://graph.microsoft.com/v1.0/me/drive"
 
 
@@ -1199,8 +1199,8 @@ class StickerEngine:
             if missing:
                 return [], f"Missing columns: {', '.join(sorted(missing))}"
 
-            # Filter to this job's rows (jobnumber may be int or str in CSV)
-            df = df[df["jobnumber"].astype(str).str.strip() == str(int(job_id))]
+            # Filter to this job's rows — jobnumber stored as "XXXXXX-XXX" string
+            df = df[df["jobnumber"].astype(str).str.strip() == job_id]
             if df.empty:
                 return [], f"No rows for job {job_id} found in CSV"
 
@@ -1578,6 +1578,20 @@ class BuildersQRLabelsApp:
         banner = tk.Frame(self.root, bg="#ececec")
         banner.pack(fill=tk.X, side=tk.BOTTOM)
         self._setup_banner(banner)
+
+        self._bind_shortcuts()
+
+    def _bind_shortcuts(self) -> None:
+        """Register global keyboard shortcuts on the root window."""
+        self.root.bind("<F5>",               lambda _e: self._on_validate())
+        self.root.bind("<Control-g>",        lambda _e: self._on_generate())
+        self.root.bind("<Control-u>",        lambda _e: self._on_upload())
+        self.root.bind("<Control-S>",        lambda _e: self._on_sync_all())   # Ctrl+Shift+S
+        self.root.bind("<Control-comma>",    lambda _e: self._on_settings())
+        self.root.bind("<Control-a>",        lambda _e: self._tree.selection_set(
+                                                self._tree.get_children()))
+        self.root.bind("<Escape>",           lambda _e: self._tree.selection_remove(
+                                                self._tree.selection()))
 
     def _setup_toolbar(self, parent: tk.Frame) -> None:
         btn: dict[str, Any] = dict(relief=tk.FLAT, bg="#ececec", padx=6, pady=3,
@@ -2218,8 +2232,8 @@ class BuildersQRLabelsApp:
                 txt.insert(tk.END, f"Could not read log file: {exc}")
         else:
             txt.insert(tk.END,
-                       "(No log file yet.\n"
-                       "File logging is added in Phase 7 via Settings → Log Path.)")
+                       "(No log file found.\n"
+                       "Set a Log Path in Settings to enable file logging.)")
         txt.config(state="disabled")
 
     # ── Misc helpers ──────────────────────────────────────────────────────────
