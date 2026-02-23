@@ -1,0 +1,8 @@
+jobnumber,trsname,trusstype,batch,customer,jobname,qty,ply
+208125-001,JT01,Common Truss,I01,Lakeside Development,Aspen Grove Project,13,1
+208125-001,JT02,Common Truss,I01,Lakeside Development,Aspen Grove Project,13,1
+208125-001,JT03,Common Truss,I01,Lakeside Development,Aspen Grove Project,10,1
+208125-001,JT04,Common Truss,I02,Lakeside Development,Aspen Grove Project,10,1
+208125-001,SCI1,Scissor Truss,I02,Lakeside Development,Aspen Grove Project,5,1
+208125-001,GDR1,Girder Truss,I02,Lakeside Development,Aspen Grove Project,4,2
+208125-001,GB01,Gable End,I02,Lakeside Development,Aspen Grove Project,2,1

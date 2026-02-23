@@ -1,0 +1,10 @@
+jobnumber,trsname,trusstype,batch,customer,jobname,qty,ply
+207999-001,CT01,Common Truss,E01,Valley Construction,Pine Valley Homes,14,1
+207999-001,CT02,Common Truss,E01,Valley Construction,Pine Valley Homes,14,1
+207999-001,CT03,Common Truss,E01,Valley Construction,Pine Valley Homes,12,1
+207999-001,CT04,Common Truss,E01,Valley Construction,Pine Valley Homes,12,1
+207999-001,HT01,Hip Truss,E01,Valley Construction,Pine Valley Homes,8,2
+207999-001,HT02,Hip Truss,E02,Valley Construction,Pine Valley Homes,8,2
+207999-001,GB01,Gable End,E02,Valley Construction,Pine Valley Homes,2,1
+207999-001,AT01,Attic Truss,E02,Valley Construction,Pine Valley Homes,5,1
+207999-001,GR01,Girder Truss,E02,Valley Construction,Pine Valley Homes,3,3

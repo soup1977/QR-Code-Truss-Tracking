@@ -1,0 +1,7 @@
+jobnumber,trsname,trusstype,batch,customer,jobname,qty,ply
+208050-002,RFT1,Common Truss,F01,Peak Home Builders,Birchwood Development,9,1
+208050-002,RFT2,Common Truss,F01,Peak Home Builders,Birchwood Development,9,1
+208050-002,MNO1,Mono Pitch,F01,Peak Home Builders,Birchwood Development,7,1
+208050-002,MNO2,Mono Pitch,F01,Peak Home Builders,Birchwood Development,7,1
+208050-002,GB01,Gable End,F01,Peak Home Builders,Birchwood Development,2,1
+208050-002,GRD1,Girder Truss,F01,Peak Home Builders,Birchwood Development,4,2

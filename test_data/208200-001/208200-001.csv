@@ -1,0 +1,6 @@
+jobnumber,trsname,trusstype,batch,customer,jobname,qty,ply
+208200-001,CMN1,Common Truss,C01,ABC Homes Inc.,Cedar Ridge Phase 1,12,1
+208200-001,CMN2,Common Truss,C01,ABC Homes Inc.,Cedar Ridge Phase 1,12,1
+208200-001,SCR1,Scissor Truss,C01,ABC Homes Inc.,Cedar Ridge Phase 1,6,1
+208200-001,GAB1,Gable End,C01,ABC Homes Inc.,Cedar Ridge Phase 1,2,1
+208200-001,GDR1,Girder Truss,C01,ABC Homes Inc.,Cedar Ridge Phase 1,3,3

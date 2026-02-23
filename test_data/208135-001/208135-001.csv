@@ -1,0 +1,7 @@
+jobnumber,trsname,trusstype,batch,customer,jobname,qty,ply
+208135-001,CJ01,Common Joist,A01,Smith Construction,Maple Street Subdiv,8,1
+208135-001,CJ02,Common Joist,A01,Smith Construction,Maple Street Subdiv,8,1
+208135-001,CJ03,Common Joist,A01,Smith Construction,Maple Street Subdiv,6,1
+208135-001,HIP1,Hip Truss,A01,Smith Construction,Maple Street Subdiv,4,2
+208135-001,GAB1,Gable End,A01,Smith Construction,Maple Street Subdiv,2,1
+208135-001,GIR1,Girder Truss,A01,Smith Construction,Maple Street Subdiv,3,3

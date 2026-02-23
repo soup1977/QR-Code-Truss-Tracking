@@ -1,0 +1,8 @@
+jobnumber,trsname,trusstype,batch,customer,jobname,qty,ply
+208201-003,T01,Common Truss,D01,Ridgeline Development,Elm Street Project,15,1
+208201-003,T02,Common Truss,D01,Ridgeline Development,Elm Street Project,15,1
+208201-003,T03,Common Truss,D01,Ridgeline Development,Elm Street Project,10,1
+208201-003,H01,Hip Truss,D01,Ridgeline Development,Elm Street Project,6,2
+208201-003,H02,Hip Truss,D02,Ridgeline Development,Elm Street Project,6,2
+208201-003,G01,Gable End,D02,Ridgeline Development,Elm Street Project,2,1
+208201-003,V01,Valley Set,D02,Ridgeline Development,Elm Street Project,4,1

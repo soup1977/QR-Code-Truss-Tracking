@@ -1,0 +1,9 @@
+jobnumber,trsname,trusstype,batch,customer,jobname,qty,ply
+208150-002,MT01,Common Truss,J01,Mountain View Homes,Cottonwood Commons,16,1
+208150-002,MT02,Common Truss,J01,Mountain View Homes,Cottonwood Commons,16,1
+208150-002,MT03,Common Truss,J01,Mountain View Homes,Cottonwood Commons,14,1
+208150-002,MT04,Common Truss,J01,Mountain View Homes,Cottonwood Commons,14,1
+208150-002,HT01,Hip Truss,J01,Mountain View Homes,Cottonwood Commons,9,2
+208150-002,HT02,Hip Truss,J02,Mountain View Homes,Cottonwood Commons,9,2
+208150-002,AT01,Attic Truss,J02,Mountain View Homes,Cottonwood Commons,6,1
+208150-002,GB01,Gable End,J02,Mountain View Homes,Cottonwood Commons,2,1
