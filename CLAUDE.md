@@ -112,10 +112,10 @@ Watch Folder/
 
 Exclusion pattern: `re.match(rf"{re.escape(job_id)}_JOB_", filename, flags=re.IGNORECASE)`
 
-### Target / Jobs Folder (Sticker Manager + upload destination)
+### Local Jobsite Package Folder (Sticker Manager + upload destination)
 
 ```
-Target Folder/
+Local Jobsite Package Folder/
 └── 208135-001/
     ├── 208135-001.csv                       ← REQUIRED for sticker generation
     ├── 208135-001_QR.svg                    ← REQUIRED for sticker generation
@@ -235,6 +235,6 @@ For multi-machine use, store a SQLite DB on a network share. `db_path` in `confi
 | Key | Example Value |
 |---|---|
 | `watch_folder` | `\\SERVER\Jobs\Watch` |
-| `target_folder` | `\\SERVER\Jobs\Target` |
+| `target_folder` | `\\SERVER\Jobs\LocalFinals` *(Local Jobsite Package Folder)* |
 | `auto_refresh_seconds` | `30` |
 | `log_path` | `\\SERVER\BuildersQRLabels\builders_qr_labels.log` |
