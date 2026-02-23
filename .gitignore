@@ -1,0 +1,37 @@
+# Virtual environments
+.venv/
+.venv-*/
+venv/
+env/
+
+# Runtime / auto-generated files (may contain credentials)
+config.json
+cache.json
+token_dropbox.json
+token_onedrive.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code local session data
+.claude/
+
+# IDE
+.idea/
+.vscode/
+*.suo
+*.user
