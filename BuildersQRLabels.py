@@ -8,6 +8,8 @@ Architecture: AppConfig → JobDatabase → JobManager → StickerEngine
               BuildersQRLabelsApp (Tkinter UI — Phase 3)
 """
 
+__version__ = "0.9.0"
+
 # ── Standard library ──────────────────────────────────────────────────────────
 import json
 import logging
@@ -208,6 +210,53 @@ class AppConfig:
     def company_address(self) -> str:     return self._get("company_address")
     @company_address.setter
     def company_address(self, v: str):    self._set("company_address", v)
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# UpdateChecker — startup version check against network share
+# ════════════════════════════════════════════════════════════════════════════════
+
+class UpdateChecker:
+    """
+    Checks for a newer version by reading version.json from the same directory
+    as the database file on the network share.
+
+    version.json schema (IT maintains this file on the share):
+      {
+        "version": "0.9.1",
+        "installer_path": "\\\\SERVER\\BuildersQRLabels\\BuildersConnect-0.9.1-Setup.exe",
+        "release_notes": "Bug fixes and improvements"
+      }
+
+    Runs in a daemon thread — silently no-ops if the file is missing or the
+    network is unavailable.  Calls notify_callback(data) on the main thread
+    when a newer version is found.
+    """
+
+    VERSION_FILENAME = "version.json"
+
+    def __init__(self, current_version: str, db_path: str, notify_callback) -> None:
+        self._current = tuple(int(x) for x in current_version.split("."))
+        version_dir = os.path.dirname(os.path.abspath(db_path)) if db_path else ""
+        self._version_file = os.path.join(version_dir, self.VERSION_FILENAME) if version_dir else ""
+        self._notify = notify_callback
+
+    def check_async(self) -> None:
+        """Start a background thread to check for updates."""
+        t = threading.Thread(target=self._check, daemon=True)
+        t.start()
+
+    def _check(self) -> None:
+        if not self._version_file:
+            return
+        try:
+            with open(self._version_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            remote = tuple(int(x) for x in str(data["version"]).split("."))
+            if remote > self._current:
+                self._notify(data)
+        except Exception:
+            pass  # network unavailable or file missing — silent no-op
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -1503,7 +1552,7 @@ class BuildersQRLabelsApp:
 
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        self.root.title("Builders Connect — QR Labels")
+        self.root.title(f"Builders Connect — QR Labels  v{__version__}")
         self.root.geometry("700x650")
         self.root.minsize(600, 450)
 
@@ -1536,6 +1585,14 @@ class BuildersQRLabelsApp:
         # ── Kick off initial scan + periodic refresh ──────────────────────────
         self._run(self._scan_task)
         self._schedule_refresh()
+
+        # ── Check for updates (non-blocking, silent if network unavailable) ───
+        self._update_bar: Optional[tk.Frame] = None
+        UpdateChecker(
+            __version__,
+            self._config.db_path,
+            lambda data: self._ui(self._show_update_banner, data),
+        ).check_async()
 
     # ── Threading helpers ─────────────────────────────────────────────────────
 
@@ -1573,6 +1630,7 @@ class BuildersQRLabelsApp:
 
         status = tk.Frame(self.root, bg="#ececec", bd=1, relief=tk.SUNKEN)
         status.pack(fill=tk.X, side=tk.BOTTOM)
+        self._status_frame = status
         self._setup_statusbar(status)
 
         banner = tk.Frame(self.root, bg="#ececec")
@@ -1710,6 +1768,45 @@ class BuildersQRLabelsApp:
                 except Exception:
                     pass
                 break
+
+    def _show_update_banner(self, data: dict) -> None:
+        """Show a dismissible yellow update-available bar above the status bar."""
+        if self._update_bar is not None:
+            return  # already shown
+        version = data.get("version", "?")
+        installer_path = data.get("installer_path", "")
+        notes = data.get("release_notes", "")
+        msg = f"Update available: v{version}"
+        if notes:
+            msg += f" — {notes}"
+
+        bar = tk.Frame(self.root, bg="#fff59d", bd=1, relief=tk.FLAT)
+        bar.pack(fill=tk.X, side=tk.BOTTOM, before=self._status_frame)
+        self._update_bar = bar
+
+        tk.Label(bar, text=msg, bg="#fff59d", padx=8, pady=3,
+                 font=("TkDefaultFont", 9, "bold")).pack(side=tk.LEFT)
+
+        if installer_path:
+            installer_dir = os.path.dirname(installer_path)
+            tk.Button(
+                bar, text="Open Installer Folder",
+                command=lambda: os.startfile(installer_dir),
+                relief=tk.FLAT, bg="#f9a825", fg="#000",
+                padx=6, pady=2, cursor="hand2",
+            ).pack(side=tk.LEFT, padx=(4, 0), pady=2)
+
+        tk.Button(
+            bar, text="Dismiss",
+            command=self._dismiss_update_banner,
+            relief=tk.FLAT, bg="#fff59d", fg="#555",
+            padx=6, pady=2, cursor="hand2",
+        ).pack(side=tk.RIGHT, padx=4, pady=2)
+
+    def _dismiss_update_banner(self) -> None:
+        if self._update_bar is not None:
+            self._update_bar.destroy()
+            self._update_bar = None
 
     def _load_icons(self) -> None:
         for name in ("folder", "watch", "validate", "generate",

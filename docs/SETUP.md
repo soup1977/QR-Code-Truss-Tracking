@@ -177,7 +177,7 @@ contains credentials.
   "onedrive_client_id":  "",
   "onedrive_tenant_id":  "common",
   "company_name":        "Builders Inc.",
-  "company_address":     "2644 Byington Solway Rd, Knoxville"
+  "company_address":     "17600 E Smith Rd. Aurora, CO 80011"
 }
 ```
 
@@ -239,6 +239,20 @@ Watch Folder\
 
 Files whose names match `208135-001_JOB_*.pdf` are automatically excluded
 from cloud uploads.
+
+### The CSV must be named {JOBNUMBER}.csv with these columns (case-insensitive):
+
+| Column	| Type	| Purpose
+|---|---|
+jobnumber|	int|	Row filter: df[df['jobnumber'] == int(job_id)]|
+trsname|	str|	Truss code (large text on sticker)|
+trusstype|	str|	Truss type description|
+batch|	str|	Batch grouping (last 2 chars = batch code)|
+customer|	str|	Client name (truncated to 25 chars)|
+jobname|	str|	Project name (truncated to 25 chars)|
+qty|	int|	Stickers per truss|
+ply|	int|	If > 1: total = qty × ply; if == 1: total = qty|
+
 
 ---
 
