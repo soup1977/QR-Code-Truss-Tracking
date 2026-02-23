@@ -331,7 +331,7 @@ Key fixes vs. legacy:
 │ [Search...                                              ] [🔍] [✕]      │
 ├────────────────────────────────────────────────────────────────────────┤
 │ Job ID  │ Stickers │ Sticker Status │ Cloud Status │  %  │ Timestamp   │
-│ 1234567 │   42     │   Pending      │   Local      │ 50% │ 10:30       │
+│ 208135-001 │  42   │   Pending      │   Local      │ 50% │ 10:30       │
 │ 2345678 │   18     │   Completed    │   Uploaded   │100% │ 10:28       │
 │ 3456789 │  Error   │   Error        │   Pending    │  0% │ 10:25       │
 ├────────────────────────────────────────────────────────────────────────┤
@@ -357,7 +357,7 @@ Key fixes vs. legacy:
 
 | Column | Width | Content |
 |---|---|---|
-| Job ID | 85px | 7-digit job number |
+| Job ID | 105px | Job number in XXXXXX-XXX format (e.g. 208135-001) |
 | Stickers | 75px | Sticker count or "Missing: CSV" |
 | Sticker Status | 115px | Pending / Completed / Error |
 | Cloud Status | 115px | Uploaded / Local / Pending / Cloud Only / etc. |
@@ -533,13 +533,13 @@ Log levels used throughout:
 
 ---
 
-## Phase 8 — Final Polish
+## Phase 8 — Final Polish ✓
 
-### 8.1 — Scrollbar
+### 8.1 — Scrollbar ✓
 
-Add `ttk.Scrollbar` linked to the Treeview (keep mousewheel binding as well).
+`ttk.Scrollbar` (vertical + horizontal) linked to Treeview; mousewheel binding kept.
 
-### 8.2 — Keyboard shortcuts
+### 8.2 — Keyboard shortcuts ✓
 
 | Shortcut | Action |
 |---|---|
@@ -551,16 +551,19 @@ Add `ttk.Scrollbar` linked to the Treeview (keep mousewheel binding as well).
 | `Ctrl+A` | Select all |
 | `Esc` | Clear selection |
 
-### 8.3 — Token persistence
+### 8.3 — Token persistence ✓
 
-On startup, for each completed job found in the DB, call
-`recover_tokens_from_summary()` so sticker tokens survive app restarts.
+On startup, `_scan_task` calls `recover_tokens_from_summary()` for each Completed job.
 
-### 8.4 — Error log viewer
+### 8.4 — Error log viewer ✓
 
-When errors occur during a session, the status bar shows "⚠ N errors — View Log".
-Clicking it opens a scrollable read-only text window showing the current session's
-error entries from the log file.
+Status bar shows "⚠ N errors — View Log"; clicking opens a scrollable read-only
+window with the full log file contents.
+
+### 8.5 — Job ID format ✓ (discovered during Phase 8)
+
+Job numbers follow `XXXXXX-XXX` format (e.g. `208135-001`).
+`JOB_ID_RE` updated to `r"^\d{6}-\d{3}$"`; CSV `jobnumber` compared as string directly.
 
 ---
 
