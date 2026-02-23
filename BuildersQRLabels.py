@@ -389,6 +389,18 @@ class JobDatabase:
                 logging.exception("get_job failed for %s", job_id)
                 return None
 
+    def delete_job(self, job_id: str) -> None:
+        if not self._available:
+            return
+        with self._lock:
+            try:
+                conn = self._open()
+                conn.execute("DELETE FROM jobs WHERE job_id = ?", (job_id,))
+                conn.commit()
+                conn.close()
+            except Exception:
+                logging.exception("delete_job failed for %s", job_id)
+
     @staticmethod
     def _row_to_job(row: sqlite3.Row) -> JobInfo:
         return JobInfo(
@@ -978,6 +990,19 @@ class JobManager:
             )
             self._db.upsert_job(info)
 
+        # Prune DB records with no local folder.
+        # Cloud-terminal statuses (Uploaded, Cloud Only) are kept — folder may be
+        # intentionally absent after upload.  Everything else is an orphan.
+        _KEEP_STATUSES = {"Uploaded", "Cloud Only"}
+        pruned = 0
+        for db_job in self._db.get_all_jobs():
+            if db_job.job_id not in jobs and db_job.cloud_status not in _KEEP_STATUSES:
+                self._db.delete_job(db_job.job_id)
+                pruned += 1
+                log.info("Pruned orphaned job from DB: %s", db_job.job_id)
+        if pruned:
+            log.info("Pruned %d orphaned job(s) from DB", pruned)
+
         result = sorted(jobs.values(), key=lambda j: j.job_id)
         log.info("Scan complete: %d jobs found", len(result))
         return result
@@ -1338,13 +1363,13 @@ class StickerEngine:
         # Row 1 — Job ID | Customer | Sticker counter
         row1_y = H - 4 * mm
         c.setFont("Helvetica-Bold", 10)
-        c.drawString(tx_left, row1_y, job_id)
+        c.drawString(left_qr_x, row1_y, job_id)
 
         c.setFont("Helvetica-Bold", 9)
         c.drawCentredString(tx_center, row1_y, truss["customer"])
 
         c.setFont("Helvetica-Bold", 7)
-        c.drawRightString(tx_right, row1_y, sticker_type)
+        c.drawRightString(W - m, row1_y, sticker_type)
 
         # Row 2 — Job name
         row2_y = H - 7 * mm
@@ -1924,6 +1949,17 @@ class BuildersQRLabelsApp:
 
     def _update_tree_partial(self, fresh_jobs: list[JobInfo]) -> None:
         """Update only rows whose status changed — avoids full flicker on auto-refresh."""
+        fresh_ids = {j.job_id for j in fresh_jobs}
+
+        # Remove jobs no longer present in the DB (pruned by scan_all)
+        for job in list(self._jobs):
+            if job.job_id not in fresh_ids:
+                self._jobs.remove(job)
+                try:
+                    self._tree.delete(job.job_id)
+                except tk.TclError:
+                    pass
+
         current_ids = {j.job_id for j in self._jobs}
         for job in fresh_jobs:
             if job.job_id not in current_ids:
