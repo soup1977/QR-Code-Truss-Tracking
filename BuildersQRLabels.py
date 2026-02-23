@@ -360,6 +360,13 @@ class JobDatabase:
             except Exception:
                 logging.exception("set_setting failed for %s", key)
 
+    def reconnect(self, new_path: str) -> None:
+        """Switch to a new database path (called when the user changes DB Path in Settings)."""
+        with self._lock:
+            self._path = new_path.strip() or self.LOCAL_FALLBACK
+            self._available = False
+        self._connect()
+
 
 # ════════════════════════════════════════════════════════════════════════════════
 # CloudProvider — abstract base
@@ -1466,7 +1473,16 @@ class BuildersQRLabelsApp:
                                 "(Cloud upload coming in Phase 5.)")
 
     def _on_settings(self) -> None:
-        messagebox.showinfo("Settings", "Settings dialog coming in Phase 4.")
+        dlg = SettingsDialog(self.root, self._config, self._db)
+        dlg.wait()
+        # Reinitialise cloud provider in case the user switched providers
+        self._init_cloud()
+        # Reschedule refresh with potentially updated interval
+        if self._refresh_id:
+            self.root.after_cancel(self._refresh_id)
+            self._refresh_id = None
+        self._schedule_refresh()
+        self._update_statusbar()
 
     # ── Treeview management ───────────────────────────────────────────────────
 
@@ -1800,6 +1816,502 @@ class BuildersQRLabelsApp:
 
     def _job_by_id(self, job_id: str) -> Optional[JobInfo]:
         return next((j for j in self._jobs if j.job_id == job_id), None)
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# SettingsDialog
+# ════════════════════════════════════════════════════════════════════════════════
+
+class SettingsDialog:
+    """
+    Modal settings dialog.  Three tabbed sections:
+      Cloud   — provider radio, Dropbox credentials + auth, OneDrive credentials + auth
+      Paths   — DB path, Watch/Target/Log folders, auto-refresh interval
+      Company — company name and address
+
+    On Save:
+      Per-machine settings (cloud credentials, db_path, company) → config.json
+      Shared settings (watch_folder, target_folder, log_path, auto_refresh_seconds)
+        → DB settings table (propagated to all machines on next auto-refresh)
+    """
+
+    def __init__(self, parent: tk.Tk, config: AppConfig, db: JobDatabase) -> None:
+        self._config = config
+        self._db     = db
+
+        self._top = tk.Toplevel(parent)
+        self._top.title("Settings")
+        self._top.geometry("520x520")
+        self._top.resizable(False, True)
+        self._top.grab_set()
+        self._top.focus_set()
+
+        # ── StringVar for every editable field ───────────────────────────────
+        self._provider_var   = tk.StringVar(value=config.cloud_provider)
+        self._dbx_key_var    = tk.StringVar(value=config.dropbox_app_key)
+        self._dbx_secret_var = tk.StringVar(value=config.dropbox_app_secret)
+        self._od_client_var  = tk.StringVar(value=config.onedrive_client_id)
+        self._od_tenant_var  = tk.StringVar(value=config.onedrive_tenant_id)
+        self._db_path_var    = tk.StringVar(value=config.db_path)
+        self._watch_var      = tk.StringVar(value=db.get_setting("watch_folder"))
+        self._target_var     = tk.StringVar(value=db.get_setting("target_folder"))
+        self._log_var        = tk.StringVar(value=db.get_setting("log_path"))
+        self._refresh_var    = tk.StringVar(value=db.get_setting("auto_refresh_seconds", "30"))
+        self._company_var    = tk.StringVar(value=config.company_name)
+        self._address_var    = tk.StringVar(value=config.company_address)
+
+        # Status labels populated during _build_ui
+        self._dbx_status_lbl: Optional[tk.Label] = None
+        self._od_status_lbl:  Optional[tk.Label] = None
+        self._db_status_lbl:  Optional[tk.Label] = None
+
+        # LabelFrames kept as instance vars so _refresh_provider_sections can reach them
+        self._dbx_lf: Optional[tk.LabelFrame] = None
+        self._od_lf:  Optional[tk.LabelFrame] = None
+
+        self._build_ui()
+
+    # ── UI construction ───────────────────────────────────────────────────────
+
+    def _build_ui(self) -> None:
+        outer = tk.Frame(self._top, padx=10, pady=8)
+        outer.pack(fill=tk.BOTH, expand=True)
+
+        nb = ttk.Notebook(outer)
+        nb.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
+
+        cloud_tab = tk.Frame(nb, padx=10, pady=8)
+        nb.add(cloud_tab, text="  Cloud  ")
+        self._build_cloud_tab(cloud_tab)
+
+        paths_tab = tk.Frame(nb, padx=10, pady=8)
+        nb.add(paths_tab, text="  Paths  ")
+        self._build_paths_tab(paths_tab)
+
+        co_tab = tk.Frame(nb, padx=10, pady=8)
+        nb.add(co_tab, text="  Company  ")
+        self._build_company_tab(co_tab)
+
+        btn_row = tk.Frame(outer)
+        btn_row.pack(anchor="e")
+        tk.Button(btn_row, text="Cancel", width=10,
+                  command=self._top.destroy).pack(side=tk.LEFT, padx=(0, 8))
+        tk.Button(btn_row, text="Save",   width=10,
+                  command=self._save).pack(side=tk.LEFT)
+
+        self._top.protocol("WM_DELETE_WINDOW", self._top.destroy)
+
+    def _build_cloud_tab(self, parent: tk.Frame) -> None:
+        prov_lf = tk.LabelFrame(parent, text="Provider", padx=8, pady=6)
+        prov_lf.pack(fill=tk.X, pady=(0, 8))
+        tk.Radiobutton(prov_lf, text="Dropbox",
+                       variable=self._provider_var, value="dropbox",
+                       command=self._refresh_provider_sections).pack(side=tk.LEFT, padx=(0, 24))
+        tk.Radiobutton(prov_lf, text="OneDrive",
+                       variable=self._provider_var, value="onedrive",
+                       command=self._refresh_provider_sections).pack(side=tk.LEFT)
+
+        # Dropbox credentials
+        self._dbx_lf = tk.LabelFrame(parent, text="Dropbox", padx=8, pady=6)
+        self._dbx_lf.pack(fill=tk.X, pady=(0, 8))
+        self._add_entry(self._dbx_lf, "App Key:",    self._dbx_key_var,    row=0)
+        self._add_entry(self._dbx_lf, "App Secret:", self._dbx_secret_var, row=1, show="*")
+        dbx_btns = tk.Frame(self._dbx_lf)
+        dbx_btns.grid(row=2, column=0, columnspan=3, sticky="w", pady=(6, 0))
+        tk.Button(dbx_btns, text="Authenticate with Dropbox",
+                  command=self._auth_dropbox).pack(side=tk.LEFT, padx=(0, 10))
+        self._dbx_status_lbl = tk.Label(dbx_btns, text="")
+        self._dbx_status_lbl.pack(side=tk.LEFT)
+        self._update_dbx_status()
+
+        # OneDrive credentials
+        self._od_lf = tk.LabelFrame(parent, text="OneDrive", padx=8, pady=6)
+        self._od_lf.pack(fill=tk.X)
+        self._add_entry(self._od_lf, "Client ID:", self._od_client_var, row=0)
+        self._add_entry(self._od_lf, "Tenant ID:", self._od_tenant_var, row=1)
+        od_btns = tk.Frame(self._od_lf)
+        od_btns.grid(row=2, column=0, columnspan=3, sticky="w", pady=(6, 0))
+        tk.Button(od_btns, text="Authenticate with OneDrive",
+                  command=self._auth_onedrive).pack(side=tk.LEFT, padx=(0, 10))
+        self._od_status_lbl = tk.Label(od_btns, text="")
+        self._od_status_lbl.pack(side=tk.LEFT)
+        self._update_od_status()
+
+        self._refresh_provider_sections()
+
+    def _build_paths_tab(self, parent: tk.Frame) -> None:
+        # DB path (per-machine bootstrap)
+        db_lf = tk.LabelFrame(parent, text="Shared Database", padx=8, pady=6)
+        db_lf.pack(fill=tk.X, pady=(0, 8))
+        self._add_browse_entry(db_lf, "DB Path:", self._db_path_var, row=0,
+                               browse_fn=self._browse_db)
+        tk.Button(db_lf, text="Test Connection",
+                  command=self._test_db_connection).grid(
+                  row=1, column=1, sticky="w", padx=(6, 0), pady=(4, 0))
+        db_status_row = tk.Frame(db_lf)
+        db_status_row.grid(row=2, column=0, columnspan=3, sticky="w", pady=(2, 0))
+        tk.Label(db_status_row, text="Status:").pack(side=tk.LEFT, padx=(0, 4))
+        self._db_status_lbl = tk.Label(db_status_row, text="")
+        self._db_status_lbl.pack(side=tk.LEFT)
+        self._test_db_connection()
+
+        # Shared folder paths (go to DB settings table)
+        folders_lf = tk.LabelFrame(
+            parent,
+            text="Shared Folders  \u2015  saved to database, visible on all machines",
+            padx=8, pady=6,
+        )
+        folders_lf.pack(fill=tk.X, pady=(0, 8))
+        self._add_browse_entry(folders_lf, "Watch Folder:",  self._watch_var,  row=0,
+                               browse_fn=self._browse_dir)
+        self._add_browse_entry(folders_lf, "Target Folder:", self._target_var, row=1,
+                               browse_fn=self._browse_dir)
+        self._add_browse_entry(folders_lf, "Log Path:",      self._log_var,    row=2,
+                               browse_fn=self._browse_log)
+
+        # Auto-refresh spinbox
+        ref_row = tk.Frame(parent)
+        ref_row.pack(anchor="w", pady=(0, 4))
+        tk.Label(ref_row, text="Auto-refresh every:").pack(side=tk.LEFT, padx=(0, 6))
+        vcmd = (self._top.register(lambda s: s == "" or s.isdigit()), "%P")
+        ttk.Spinbox(ref_row, textvariable=self._refresh_var,
+                    from_=5, to=3600, width=6,
+                    validate="key", validatecommand=vcmd).pack(side=tk.LEFT)
+        tk.Label(ref_row, text="seconds").pack(side=tk.LEFT, padx=(6, 0))
+
+    def _build_company_tab(self, parent: tk.Frame) -> None:
+        co_lf = tk.LabelFrame(parent, text="Company Info", padx=8, pady=6)
+        co_lf.pack(fill=tk.X)
+        self._add_entry(co_lf, "Name:",    self._company_var, row=0)
+        self._add_entry(co_lf, "Address:", self._address_var, row=1)
+
+    # ── Grid helpers ──────────────────────────────────────────────────────────
+
+    def _add_entry(self, parent: tk.Widget, label: str, var: tk.StringVar,
+                   row: int, show: str = "") -> None:
+        """Label + Entry in a grid-managed parent."""
+        tk.Label(parent, text=label, anchor="e", width=12).grid(
+            row=row, column=0, sticky="e", pady=3)
+        tk.Entry(parent, textvariable=var, width=36, show=show).grid(
+            row=row, column=1, columnspan=2, sticky="ew", padx=(6, 0), pady=3)
+        parent.columnconfigure(1, weight=1)
+
+    def _add_browse_entry(self, parent: tk.Widget, label: str, var: tk.StringVar,
+                          row: int, browse_fn) -> None:
+        """Label + Entry + Browse button in a grid-managed parent."""
+        tk.Label(parent, text=label, anchor="e", width=14).grid(
+            row=row, column=0, sticky="e", pady=3)
+        tk.Entry(parent, textvariable=var, width=28).grid(
+            row=row, column=1, sticky="ew", padx=(6, 0), pady=3)
+        tk.Button(parent, text="Browse", width=7,
+                  command=lambda v=var: browse_fn(v)).grid(
+            row=row, column=2, padx=(4, 0), pady=3)
+        parent.columnconfigure(1, weight=1)
+
+    # ── Provider enable / disable ─────────────────────────────────────────────
+
+    def _refresh_provider_sections(self) -> None:
+        provider = self._provider_var.get()
+        if self._dbx_lf:
+            self._set_children_state(
+                self._dbx_lf,
+                tk.NORMAL if provider == "dropbox" else tk.DISABLED,
+            )
+        if self._od_lf:
+            self._set_children_state(
+                self._od_lf,
+                tk.NORMAL if provider == "onedrive" else tk.DISABLED,
+            )
+
+    @staticmethod
+    def _set_children_state(widget: tk.Widget, state) -> None:
+        for child in widget.winfo_children():
+            try:
+                child.configure(state=state)
+            except tk.TclError:
+                pass
+            SettingsDialog._set_children_state(child, state)
+
+    # ── Auth status labels ────────────────────────────────────────────────────
+
+    def _update_dbx_status(self) -> None:
+        ok = os.path.exists("token_dropbox.json")
+        if self._dbx_status_lbl:
+            self._dbx_status_lbl.config(
+                text="\u2713 Authenticated" if ok else "\u2717 Not authenticated",
+                fg="#2e7d32" if ok else "#b71c1c",
+            )
+
+    def _update_od_status(self) -> None:
+        ok = os.path.exists("token_onedrive.json")
+        if self._od_status_lbl:
+            self._od_status_lbl.config(
+                text="\u2713 Authenticated" if ok else "\u2717 Not authenticated",
+                fg="#2e7d32" if ok else "#b71c1c",
+            )
+
+    # ── DB connection test ────────────────────────────────────────────────────
+
+    def _test_db_connection(self) -> None:
+        path = self._db_path_var.get().strip()
+        if not path:
+            self._set_db_status("No path configured", "#888888")
+            return
+        try:
+            probe = JobDatabase(path)
+            count = len(probe.get_all_jobs())
+            self._set_db_status(f"\u25cf Connected  ({count} jobs)", "#2e7d32")
+        except Exception as exc:
+            self._set_db_status(f"\u25cf Error: {exc}", "#b71c1c")
+
+    def _set_db_status(self, text: str, colour: str) -> None:
+        if self._db_status_lbl:
+            self._db_status_lbl.config(text=text, fg=colour)
+
+    # ── Browse helpers ────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _browse_dir(var: tk.StringVar) -> None:
+        path = filedialog.askdirectory(title="Select folder")
+        if path:
+            var.set(path)
+
+    @staticmethod
+    def _browse_db(var: tk.StringVar) -> None:
+        path = filedialog.asksaveasfilename(
+            title="Database file path",
+            defaultextension=".db",
+            filetypes=[("SQLite database", "*.db"), ("All files", "*.*")],
+        )
+        if path:
+            var.set(path)
+
+    @staticmethod
+    def _browse_log(var: tk.StringVar) -> None:
+        path = filedialog.asksaveasfilename(
+            title="Log file path",
+            defaultextension=".log",
+            filetypes=[("Log files", "*.log"), ("All files", "*.*")],
+        )
+        if path:
+            var.set(path)
+
+    # ── Dropbox auth flow ─────────────────────────────────────────────────────
+
+    def _auth_dropbox(self) -> None:
+        key    = self._dbx_key_var.get().strip()
+        secret = self._dbx_secret_var.get().strip()
+        if not key or not secret:
+            messagebox.showwarning("Dropbox", "Enter App Key and App Secret first.",
+                                   parent=self._top)
+            return
+
+        try:
+            import dropbox as _dbx
+            flow = _dbx.DropboxOAuth2FlowNoRedirect(
+                key, secret, token_access_type="offline"
+            )
+            auth_url = flow.start()
+        except Exception as exc:
+            messagebox.showerror("Dropbox", f"Could not start auth flow:\n{exc}",
+                                 parent=self._top)
+            return
+
+        import webbrowser
+        webbrowser.open(auth_url)
+
+        code = self._ask_string(
+            title="Dropbox \u2014 Paste Code",
+            prompt="A browser window has opened.\n\n"
+                   "Authorise the app, then paste the code Dropbox gives you:",
+        )
+        if not code:
+            return
+
+        try:
+            result = flow.finish(code.strip())
+            with open("token_dropbox.json", "w", encoding="utf-8") as fh:
+                json.dump(
+                    {
+                        "access_token":  result.access_token,
+                        "refresh_token": getattr(result, "refresh_token", None),
+                    },
+                    fh,
+                    indent=2,
+                )
+            self._update_dbx_status()
+            messagebox.showinfo("Dropbox", "\u2713 Authenticated successfully.",
+                                parent=self._top)
+        except Exception as exc:
+            messagebox.showerror("Dropbox", f"Authentication failed:\n{exc}",
+                                 parent=self._top)
+
+    # ── OneDrive auth flow ────────────────────────────────────────────────────
+
+    def _auth_onedrive(self) -> None:
+        client_id = self._od_client_var.get().strip()
+        tenant_id = self._od_tenant_var.get().strip() or "common"
+        if not client_id:
+            messagebox.showwarning("OneDrive", "Enter a Client ID first.",
+                                   parent=self._top)
+            return
+
+        try:
+            import msal as _msal
+            msal_app = _msal.PublicClientApplication(
+                client_id,
+                authority=f"https://login.microsoftonline.com/{tenant_id}",
+            )
+            flow_data = msal_app.initiate_device_flow(
+                scopes=["Files.ReadWrite", "offline_access"]
+            )
+        except Exception as exc:
+            messagebox.showerror("OneDrive", f"Could not start device flow:\n{exc}",
+                                 parent=self._top)
+            return
+
+        if "user_code" not in flow_data:
+            messagebox.showerror(
+                "OneDrive",
+                f"Device flow error: {flow_data.get('error_description', str(flow_data))}",
+                parent=self._top,
+            )
+            return
+
+        # Instructions window with the device code displayed prominently
+        code_win = tk.Toplevel(self._top)
+        code_win.title("OneDrive \u2014 Sign In")
+        code_win.geometry("430x210")
+        code_win.grab_set()
+
+        tk.Label(
+            code_win,
+            text=(
+                "1. Open a browser and go to:\n"
+                "   https://microsoft.com/devicelogin\n\n"
+                "2. Enter the code shown below, then sign in:"
+            ),
+            justify=tk.LEFT, padx=14, pady=10,
+        ).pack(anchor="w")
+
+        code_row = tk.Frame(code_win)
+        code_row.pack(anchor="w", padx=14)
+        tk.Label(code_row, text=flow_data["user_code"],
+                 font=("Courier New", 18, "bold"), fg="#1565c0").pack(side=tk.LEFT)
+        tk.Button(
+            code_row, text="Copy",
+            command=lambda: (
+                code_win.clipboard_clear(),
+                code_win.clipboard_append(flow_data["user_code"]),
+            ),
+        ).pack(side=tk.LEFT, padx=(12, 0))
+
+        status_lbl = tk.Label(code_win, text="Waiting for sign-in\u2026", fg="#888888")
+        status_lbl.pack(pady=(10, 0))
+
+        result_box: list = []
+
+        def _poll_thread() -> None:
+            try:
+                res = msal_app.acquire_token_by_device_flow(flow_data)
+                result_box.append(res)
+            except Exception as exc:
+                result_box.append({"error": str(exc)})
+
+        threading.Thread(target=_poll_thread, daemon=True).start()
+
+        def _check() -> None:
+            if not result_box:
+                code_win.after(1000, _check)
+                return
+            res = result_box[0]
+            if "access_token" in res:
+                cache_data = msal_app.token_cache.serialize()
+                with open("token_onedrive.json", "w", encoding="utf-8") as fh:
+                    fh.write(cache_data)
+                status_lbl.config(text="\u2713 Signed in!", fg="#2e7d32")
+                code_win.after(1400, code_win.destroy)
+                self._top.after(100, self._update_od_status)
+                self._top.after(1600, lambda: messagebox.showinfo(
+                    "OneDrive", "\u2713 Authenticated successfully.", parent=self._top))
+            else:
+                err = res.get("error_description") or res.get("error", "Unknown error")
+                status_lbl.config(text=f"Failed: {err}", fg="#b71c1c")
+                code_win.after(3000, code_win.destroy)
+
+        code_win.after(1000, _check)
+
+    # ── Simple string-entry prompt ────────────────────────────────────────────
+
+    def _ask_string(self, title: str, prompt: str) -> Optional[str]:
+        """Show a small modal dialog with one text entry; return value or None."""
+        dlg = tk.Toplevel(self._top)
+        dlg.title(title)
+        dlg.geometry("420x160")
+        dlg.grab_set()
+        tk.Label(dlg, text=prompt, justify=tk.LEFT,
+                 wraplength=390, padx=12, pady=10).pack(anchor="w")
+        val = tk.StringVar()
+        tk.Entry(dlg, textvariable=val, width=48).pack(padx=12)
+        result: list = []
+
+        def _ok() -> None:
+            result.append(val.get())
+            dlg.destroy()
+
+        btn_row = tk.Frame(dlg)
+        btn_row.pack(pady=8)
+        tk.Button(btn_row, text="Cancel", width=8, command=dlg.destroy).pack(side=tk.LEFT, padx=4)
+        tk.Button(btn_row, text="OK",     width=8, command=_ok).pack(side=tk.LEFT, padx=4)
+        dlg.bind("<Return>", lambda _e: _ok())
+        dlg.wait_window()
+        return result[0] if result else None
+
+    # ── Save ──────────────────────────────────────────────────────────────────
+
+    def _save(self) -> None:
+        try:
+            refresh_secs = int(self._refresh_var.get() or "30")
+            if refresh_secs < 5:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Settings",
+                                 "Auto-refresh must be a whole number \u2265 5.",
+                                 parent=self._top)
+            return
+
+        # Per-machine settings → config.json
+        self._config._data.update({
+            "cloud_provider":     self._provider_var.get(),
+            "dropbox_app_key":    self._dbx_key_var.get().strip(),
+            "dropbox_app_secret": self._dbx_secret_var.get().strip(),
+            "onedrive_client_id": self._od_client_var.get().strip(),
+            "onedrive_tenant_id": self._od_tenant_var.get().strip() or "common",
+            "db_path":            self._db_path_var.get().strip(),
+            "company_name":       self._company_var.get().strip(),
+            "company_address":    self._address_var.get().strip(),
+        })
+        self._config.save()
+
+        # Reconnect DB if path changed
+        new_path = self._db_path_var.get().strip()
+        if new_path != self._db._path:
+            self._db.reconnect(new_path)
+
+        # Shared settings → DB settings table
+        self._db.set_setting("watch_folder",         self._watch_var.get().strip())
+        self._db.set_setting("target_folder",        self._target_var.get().strip())
+        self._db.set_setting("log_path",             self._log_var.get().strip())
+        self._db.set_setting("auto_refresh_seconds", str(refresh_secs))
+
+        log.info("Settings saved")
+        self._top.destroy()
+
+    # ── Wait ──────────────────────────────────────────────────────────────────
+
+    def wait(self) -> None:
+        """Block until the dialog is closed (call from the main thread)."""
+        self._top.wait_window()
 
 
 # ════════════════════════════════════════════════════════════════════════════════
