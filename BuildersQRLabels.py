@@ -25,6 +25,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+# ── Tkinter (UI — Phase 3) ────────────────────────────────────────────────────
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog, scrolledtext
+
 # ── Third-party ───────────────────────────────────────────────────────────────
 import dropbox
 from dropbox import DropboxOAuth2FlowNoRedirect
@@ -1157,6 +1161,648 @@ class StickerEngine:
 
 
 # ════════════════════════════════════════════════════════════════════════════════
+# BuildersQRLabelsApp — main Tkinter UI (Phase 3)
+# ════════════════════════════════════════════════════════════════════════════════
+
+class BuildersQRLabelsApp:
+    """
+    Main application window.  Owns all widgets and coordinates backend calls.
+    All UI modifications from background threads go through self._ui().
+    """
+
+    # ── Treeview column spec: (id, heading, width_px, anchor) ────────────────
+    _COLS = (
+        ("job_id",         "Job ID",         85,  "w"),
+        ("stickers",       "Stickers",        75,  "center"),
+        ("sticker_status", "Sticker Status",  115, "center"),
+        ("cloud_status",   "Cloud Status",    115, "center"),
+        ("progress",       "Progress",         55, "center"),
+        ("timestamp",      "Last Updated",    155, "w"),
+    )
+
+    # ── Row tag → background colour ───────────────────────────────────────────
+    _TAG_BG = {
+        "done":       "#c8e6c9",   # sticker complete + uploaded
+        "partial":    "#fff9c4",   # pending or complete-not-uploaded
+        "cloud_only": "#bbdefb",   # exists in cloud but not locally
+        "active":     "#bbdefb",   # in-progress (generating / uploading)
+        "error":      "#ffcdd2",   # any error
+    }
+
+    # ── Sort key map: column id → JobInfo attribute or callable ───────────────
+    _SORT_KEYS = {
+        "job_id":         lambda j: j.job_id,
+        "stickers":       lambda j: j.sticker_qty or 0,
+        "sticker_status": lambda j: j.sticker_status,
+        "cloud_status":   lambda j: j.cloud_status,
+        "progress":       lambda j: j.cloud_progress,
+        "timestamp":      lambda j: j.last_updated,
+    }
+
+    def __init__(self, root: tk.Tk) -> None:
+        self.root = root
+        self.root.title("Builders Connect — QR Labels")
+        self.root.geometry("700x650")
+        self.root.minsize(600, 450)
+
+        # ── Backend objects ───────────────────────────────────────────────────
+        self._config  = AppConfig()
+        self._db      = JobDatabase(self._config.db_path)
+        self._cloud: Optional[CloudProvider] = None
+        self._manager = JobManager(self._db)
+        self._engine  = StickerEngine(self._config)
+        self._init_cloud()
+
+        # ── Application state ─────────────────────────────────────────────────
+        self._jobs: list[JobInfo] = []      # full list from last scan
+        self._last_scan: str = ""
+        self._session_errors: int = 0
+        self._scan_lock = threading.Lock()
+        self._refresh_id: Optional[str] = None
+
+        # ── UI ────────────────────────────────────────────────────────────────
+        self._icons: dict = {}
+        self._load_icons()
+        self._search_var = tk.StringVar()
+        self._sort_col: str = "job_id"
+        self._sort_rev: bool = False
+        self._setup_ui()
+
+        # ── Kick off initial scan + periodic refresh ──────────────────────────
+        self._run(self._scan_task)
+        self._schedule_refresh()
+
+    # ── Threading helpers ─────────────────────────────────────────────────────
+
+    def _run(self, target, *args) -> None:
+        """Launch target(*args) in a daemon background thread."""
+        threading.Thread(target=target, args=args, daemon=True).start()
+
+    def _ui(self, fn, *args) -> None:
+        """Schedule fn(*args) to run on the main thread via root.after(0, ...)."""
+        self.root.after(0, fn, *args)
+
+    # ── Backend init ──────────────────────────────────────────────────────────
+
+    def _init_cloud(self) -> None:
+        if self._config.cloud_provider == "onedrive":
+            self._cloud = OneDriveProvider(self._config)
+        else:
+            self._cloud = DropboxProvider(self._config)
+        self._manager._cloud = self._cloud
+
+    # ── UI construction ───────────────────────────────────────────────────────
+
+    def _setup_ui(self) -> None:
+        toolbar = tk.Frame(self.root, bg="#ececec", bd=1, relief=tk.FLAT)
+        toolbar.pack(fill=tk.X, padx=2, pady=(3, 0))
+        self._setup_toolbar(toolbar)
+
+        search = tk.Frame(self.root, bg="#ffffff", bd=1, relief=tk.SUNKEN)
+        search.pack(fill=tk.X, padx=2, pady=2)
+        self._setup_search(search)
+
+        tree_frame = tk.Frame(self.root)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=2)
+        self._setup_treeview(tree_frame)
+
+        status = tk.Frame(self.root, bg="#ececec", bd=1, relief=tk.SUNKEN)
+        status.pack(fill=tk.X, side=tk.BOTTOM)
+        self._setup_statusbar(status)
+
+        banner = tk.Frame(self.root, bg="#ececec")
+        banner.pack(fill=tk.X, side=tk.BOTTOM)
+        self._setup_banner(banner)
+
+    def _setup_toolbar(self, parent: tk.Frame) -> None:
+        btn = dict(relief=tk.FLAT, bg="#ececec", padx=6, pady=3,
+                   activebackground="#d0d0d0", cursor="hand2")
+        left_buttons = [
+            ("Select Folder", self._on_select_folder),
+            ("Watch Folder",  self._on_watch_folder),
+            ("Validate",      self._on_validate),
+            ("Generate",      self._on_generate),
+            ("Upload",        self._on_upload),
+            ("Sync All",      self._on_sync_all),
+        ]
+        for label, cmd in left_buttons:
+            tk.Button(parent, text=label, command=cmd, **btn).pack(
+                side=tk.LEFT, padx=2, pady=2)
+
+        tk.Button(parent, text="\u2699 Settings", command=self._on_settings, **btn
+                  ).pack(side=tk.RIGHT, padx=2, pady=2)
+
+    def _setup_search(self, parent: tk.Frame) -> None:
+        PLACEHOLDER = "Search\u2026"
+
+        self._search_entry = tk.Entry(parent, fg="#999", bg="white", relief=tk.FLAT,
+                                       font=("TkDefaultFont", 10))
+        self._search_entry.insert(0, PLACEHOLDER)
+
+        def _focus_in(_e):
+            if self._search_entry.get() == PLACEHOLDER:
+                self._search_entry.delete(0, tk.END)
+                self._search_entry.config(fg="#000")
+
+        def _focus_out(_e):
+            if not self._search_entry.get():
+                self._search_entry.insert(0, PLACEHOLDER)
+                self._search_entry.config(fg="#999")
+
+        def _key_release(_e):
+            q = self._search_entry.get()
+            self._search_var.set("" if q == PLACEHOLDER else q)
+            self._filter_tree()
+
+        self._search_entry.bind("<FocusIn>",   _focus_in)
+        self._search_entry.bind("<FocusOut>",  _focus_out)
+        self._search_entry.bind("<KeyRelease>", _key_release)
+        self._search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4, pady=3)
+
+        def _clear():
+            self._search_entry.delete(0, tk.END)
+            self._search_entry.insert(0, PLACEHOLDER)
+            self._search_entry.config(fg="#999")
+            self._search_var.set("")
+            self._filter_tree()
+
+        tk.Button(parent, text="\u2715", relief=tk.FLAT, bg="white",
+                  cursor="hand2", command=_clear).pack(side=tk.RIGHT, padx=2)
+
+    def _setup_treeview(self, parent: tk.Frame) -> None:
+        col_ids = [c[0] for c in self._COLS]
+        self._tree = ttk.Treeview(parent, columns=col_ids,
+                                   show="headings", selectmode="extended")
+
+        for col_id, heading, width, anchor in self._COLS:
+            self._tree.heading(col_id, text=heading,
+                               command=lambda c=col_id: self._sort_by(c))
+            stretch = col_id == "timestamp"
+            self._tree.column(col_id, width=width, anchor=anchor, stretch=stretch)
+
+        vsb = ttk.Scrollbar(parent, orient=tk.VERTICAL,   command=self._tree.yview)
+        hsb = ttk.Scrollbar(parent, orient=tk.HORIZONTAL, command=self._tree.xview)
+        self._tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+
+        self._tree.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")
+        parent.rowconfigure(0, weight=1)
+        parent.columnconfigure(0, weight=1)
+
+        for tag, colour in self._TAG_BG.items():
+            self._tree.tag_configure(tag, background=colour)
+
+        self._tree.bind("<Button-3>",   self._show_context_menu)
+        self._tree.bind("<Double-1>",   self._on_tree_double_click)
+        self._tree.bind("<MouseWheel>", lambda e: self._tree.yview_scroll(
+            int(-1 * (e.delta / 120)), "units"))
+
+    def _setup_statusbar(self, parent: tk.Frame) -> None:
+        lbl = dict(bg="#ececec", padx=6, pady=2, font=("TkDefaultFont", 8))
+        sep = dict(bg="#ececec", fg="#bbb", font=("TkDefaultFont", 8))
+
+        self._lbl_cloud  = tk.Label(parent, text="\u25cb Dropbox", **lbl)
+        self._lbl_cloud.pack(side=tk.LEFT)
+        tk.Label(parent, text="|", **sep).pack(side=tk.LEFT)
+
+        self._lbl_scan   = tk.Label(parent, text="Not scanned", **lbl)
+        self._lbl_scan.pack(side=tk.LEFT)
+        tk.Label(parent, text="|", **sep).pack(side=tk.LEFT)
+
+        self._lbl_count  = tk.Label(parent, text="0 jobs", **lbl)
+        self._lbl_count.pack(side=tk.LEFT)
+
+        self._lbl_errors = tk.Label(parent, text="", **lbl,
+                                     fg="#c62828", cursor="hand2")
+        self._lbl_errors.pack(side=tk.RIGHT, padx=6)
+        self._lbl_errors.bind("<Button-1>", lambda _e: self._show_error_log())
+
+    def _setup_banner(self, parent: tk.Frame) -> None:
+        for fname in ("banner.png", "banner.jpg",
+                      os.path.join("icons", "banner.png")):
+            if os.path.isfile(fname):
+                try:
+                    from PIL import ImageTk as _ITK
+                    img = _ITK.PhotoImage(file=fname)
+                    lbl = tk.Label(parent, image=img, bg="#ececec")
+                    lbl.image = img
+                    lbl.pack()
+                except Exception:
+                    pass
+                break
+
+    def _load_icons(self) -> None:
+        for name in ("folder", "watch", "validate", "generate",
+                     "upload", "sync", "settings"):
+            for ext in (".png", ".gif"):
+                path = os.path.join("icons", name + ext)
+                if os.path.isfile(path):
+                    try:
+                        self._icons[name] = tk.PhotoImage(file=path)
+                    except Exception:
+                        pass
+                    break
+
+    # ── Toolbar handlers ──────────────────────────────────────────────────────
+
+    def _on_select_folder(self) -> None:
+        current = self._db.get_setting("target_folder")
+        folder = filedialog.askdirectory(
+            title="Select Target / Jobs Folder",
+            initialdir=current or os.path.expanduser("~"),
+        )
+        if folder:
+            self._db.set_setting("target_folder", folder)
+            log.info("Target folder set: %s", folder)
+            self._run(self._scan_task)
+
+    def _on_watch_folder(self) -> None:
+        current = self._db.get_setting("watch_folder")
+        folder = filedialog.askdirectory(
+            title="Select Watch Folder",
+            initialdir=current or os.path.expanduser("~"),
+        )
+        if folder:
+            self._db.set_setting("watch_folder", folder)
+            log.info("Watch folder set: %s", folder)
+            self._run(self._scan_task)
+
+    def _on_validate(self) -> None:
+        self._run(self._scan_task)
+
+    def _on_generate(self) -> None:
+        selected = self._selected_job_ids()
+        if not selected:
+            messagebox.showinfo("Generate Stickers",
+                                "Select one or more jobs first.")
+            return
+        eligible = [
+            jid for jid in selected
+            if (j := self._job_by_id(jid)) and j.sticker_status in ("Pending", "Error")
+        ]
+        if not eligible:
+            messagebox.showinfo("Generate Stickers",
+                                "No Pending or Error jobs in selection.")
+            return
+        self._mark_active(eligible)
+        self._run(self._generate_task, eligible)
+
+    def _on_upload(self) -> None:
+        messagebox.showinfo("Upload to Cloud",
+                            "Cloud upload coming in Phase 5.")
+
+    def _on_sync_all(self) -> None:
+        if not self._db.get_setting("target_folder"):
+            messagebox.showwarning("Sync All", "Target folder is not configured.")
+            return
+        pending = [j.job_id for j in self._jobs if j.sticker_status == "Pending"]
+        if pending:
+            self._mark_active(pending)
+            self._run(self._generate_task, pending)
+        else:
+            messagebox.showinfo("Sync All",
+                                "No pending jobs to generate.\n"
+                                "(Cloud upload coming in Phase 5.)")
+
+    def _on_settings(self) -> None:
+        messagebox.showinfo("Settings", "Settings dialog coming in Phase 4.")
+
+    # ── Treeview management ───────────────────────────────────────────────────
+
+    def _rebuild_tree(self, jobs: list[JobInfo]) -> None:
+        """Clear and re-populate the tree, applying current search filter."""
+        self._jobs = jobs
+        self._tree.delete(*self._tree.get_children())
+        query = self._search_var.get().strip().lower()
+        for job in jobs:
+            if query and not (
+                query in job.job_id.lower()
+                or query in job.sticker_status.lower()
+                or query in job.cloud_status.lower()
+            ):
+                continue
+            self._tree.insert(
+                "", tk.END, iid=job.job_id,
+                values=self._tree_values(job),
+                tags=(self._tag_for_job(job),),
+            )
+        self._update_statusbar()
+
+    def _update_tree_partial(self, fresh_jobs: list[JobInfo]) -> None:
+        """Update only rows whose status changed — avoids full flicker on auto-refresh."""
+        current_ids = {j.job_id for j in self._jobs}
+        for job in fresh_jobs:
+            if job.job_id not in current_ids:
+                self._jobs.append(job)
+                try:
+                    self._tree.insert(
+                        "", tk.END, iid=job.job_id,
+                        values=self._tree_values(job),
+                        tags=(self._tag_for_job(job),),
+                    )
+                except tk.TclError:
+                    pass
+            else:
+                old = self._job_by_id(job.job_id)
+                if old and (old.sticker_status != job.sticker_status
+                            or old.cloud_status != job.cloud_status
+                            or old.sticker_qty != job.sticker_qty):
+                    old.sticker_status = job.sticker_status
+                    old.cloud_status   = job.cloud_status
+                    old.sticker_qty    = job.sticker_qty
+                    old.cloud_progress = job.cloud_progress
+                    old.last_updated   = job.last_updated
+                    self._update_job_row(old)
+        self._update_statusbar()
+
+    def _update_job_row(self, job: JobInfo) -> None:
+        """Refresh a single treeview row in-place. Safe to call from main thread only."""
+        try:
+            self._tree.item(job.job_id,
+                            values=self._tree_values(job),
+                            tags=(self._tag_for_job(job),))
+        except tk.TclError:
+            pass
+
+    def _tag_for_job(self, job: JobInfo) -> str:
+        if "Error" in (job.sticker_status, job.cloud_status):
+            return "error"
+        if job.sticker_status == "Completed" and job.cloud_status == "Uploaded":
+            return "done"
+        if job.cloud_status == "Cloud Only":
+            return "cloud_only"
+        return "partial"
+
+    def _tree_values(self, job: JobInfo) -> tuple:
+        if job.sticker_qty is not None:
+            stickers_cell = str(job.sticker_qty)
+        elif job.sticker_status == "Error":
+            stickers_cell = "Missing: CSV"
+        else:
+            stickers_cell = "\u2014"
+        ts = job.last_updated[:16].replace("T", " ") if job.last_updated else ""
+        return (
+            job.job_id,
+            stickers_cell,
+            job.sticker_status,
+            job.cloud_status,
+            job.cloud_progress,
+            ts,
+        )
+
+    def _mark_active(self, job_ids: list[str]) -> None:
+        for jid in job_ids:
+            try:
+                self._tree.item(jid, tags=("active",))
+            except tk.TclError:
+                pass
+
+    def _filter_tree(self) -> None:
+        if self._jobs:
+            self._rebuild_tree(self._jobs)
+
+    def _sort_by(self, col: str) -> None:
+        if self._sort_col == col:
+            self._sort_rev = not self._sort_rev
+        else:
+            self._sort_col = col
+            self._sort_rev = False
+        key_fn = self._SORT_KEYS.get(col, lambda j: j.job_id)
+        self._jobs.sort(key=key_fn, reverse=self._sort_rev)
+        self._rebuild_tree(self._jobs)
+
+    # ── Context menu ──────────────────────────────────────────────────────────
+
+    def _show_context_menu(self, event: tk.Event) -> None:
+        iid = self._tree.identify_row(event.y)
+        if not iid:
+            return
+        self._tree.selection_set(iid)
+        job = self._job_by_id(iid)
+        if not job:
+            return
+
+        menu = tk.Menu(self.root, tearoff=0)
+        menu.add_command(label="Open Job Folder",
+                         command=lambda: self._open_job_folder(iid))
+        menu.add_command(label="Revalidate Job",
+                         command=lambda: self._run(self._revalidate_task, iid))
+        menu.add_separator()
+
+        if job.sticker_status in ("Pending", "Error"):
+            menu.add_command(label="Generate Stickers",
+                             command=self._on_generate)
+        if job.cloud_status == "Local":
+            menu.add_command(label="Upload to Cloud",
+                             command=self._on_upload)
+        if job.cloud_status == "Cloud Only":
+            menu.add_command(label="Download from Cloud",
+                             command=lambda: messagebox.showinfo(
+                                 "Download", "Download coming in Phase 5."))
+        menu.add_command(label="Open Cloud Link",
+                         command=lambda: self._open_cloud_link(iid))
+        menu.add_separator()
+        menu.add_command(label="Copy Job ID",
+                         command=lambda: self._copy_job_id(iid))
+        menu.add_separator()
+        menu.add_command(label="Refresh", command=self._on_validate)
+
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _on_tree_double_click(self, event: tk.Event) -> None:
+        iid = self._tree.identify_row(event.y)
+        if iid:
+            self._open_job_folder(iid)
+
+    def _open_job_folder(self, job_id: str) -> None:
+        target = self._db.get_setting("target_folder")
+        if not target:
+            messagebox.showwarning("Open Folder", "Target folder not configured.")
+            return
+        path = os.path.join(target, job_id)
+        if os.path.isdir(path):
+            try:
+                os.startfile(path)
+            except Exception:
+                logging.exception("Failed to open folder: %s", path)
+        else:
+            messagebox.showwarning("Open Folder",
+                                   f"Folder not found:\n{path}")
+
+    def _open_cloud_link(self, job_id: str) -> None:
+        messagebox.showinfo("Cloud Link",
+                            "Cloud share links available after Phase 5.")
+
+    def _copy_job_id(self, job_id: str) -> None:
+        self.root.clipboard_clear()
+        self.root.clipboard_append(job_id)
+
+    # ── Background tasks ──────────────────────────────────────────────────────
+
+    def _scan_task(self) -> None:
+        if not self._scan_lock.acquire(blocking=False):
+            log.debug("Scan already in progress; skipping")
+            return
+        try:
+            self._ui(lambda: self._lbl_scan.config(text="Scanning\u2026"))
+            jobs = self._manager.scan_all()
+
+            # Recover sticker tokens for completed jobs
+            target = self._db.get_setting("target_folder")
+            if target:
+                for job in jobs:
+                    if job.sticker_status == "Completed":
+                        folder = os.path.join(target, job.job_id)
+                        if os.path.isdir(folder):
+                            self._engine.recover_tokens_from_summary(
+                                folder, job.job_id)
+
+            ts = datetime.now().strftime("%H:%M")
+            self._last_scan = ts
+            self._ui(self._rebuild_tree, jobs)
+            self._ui(lambda: self._lbl_scan.config(text=f"Last scan: {ts}"))
+        except Exception:
+            logging.exception("Scan task failed")
+            self._session_errors += 1
+            self._ui(self._update_statusbar)
+        finally:
+            self._scan_lock.release()
+
+    def _generate_task(self, job_ids: list[str]) -> None:
+        target = self._db.get_setting("target_folder")
+        if not target:
+            self._ui(messagebox.showwarning, "Generate",
+                     "Target folder is not configured.")
+            return
+
+        success, errors = 0, []
+        for job_id in job_ids:
+            job_path = os.path.join(target, job_id)
+            try:
+                self._engine.generate_pdf(job_path)
+                qty = JobManager._read_qty_from_summary(
+                    os.path.join(job_path, f"{job_id}_Stickers_Summary.txt"))
+
+                job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
+                job.sticker_status = "Completed"
+                job.sticker_qty    = qty
+                if job.cloud_status in ("Pending", "CSV Only", "Incomplete"):
+                    job.cloud_status   = "Local"
+                    job.cloud_progress = "50%"
+                job.last_updated = datetime.now().isoformat(timespec="seconds")
+                self._db.upsert_job(job)
+                success += 1
+                _j = job  # capture for lambda
+                self._ui(lambda j=_j: self._update_job_row(j))
+            except Exception as exc:
+                logging.exception("Generate failed for %s", job_id)
+                self._session_errors += 1
+                errors.append(f"{job_id}: {exc}")
+                err_job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
+                err_job.sticker_status = "Error"
+                err_job.last_updated   = datetime.now().isoformat(timespec="seconds")
+                self._db.upsert_job(err_job)
+                _ej = err_job
+                self._ui(lambda j=_ej: self._update_job_row(j))
+
+        self._ui(self._update_statusbar)
+        msg = f"Generated {success} job(s) successfully."
+        if errors:
+            msg += f"\n\nErrors ({len(errors)}):\n" + "\n".join(errors)
+            self._ui(messagebox.showwarning, "Generate Complete", msg)
+        else:
+            self._ui(messagebox.showinfo, "Generate Complete", msg)
+
+    def _revalidate_task(self, job_id: str) -> None:
+        try:
+            status, qty = self._manager.classify_sticker_status(job_id)
+            job = self._job_by_id(job_id)
+            if job:
+                job.sticker_status = status
+                job.sticker_qty    = qty
+                job.last_updated   = datetime.now().isoformat(timespec="seconds")
+                self._db.upsert_job(job)
+                _j = job
+                self._ui(lambda j=_j: self._update_job_row(j))
+        except Exception:
+            logging.exception("Revalidate failed for %s", job_id)
+
+    # ── Auto-refresh ──────────────────────────────────────────────────────────
+
+    def _schedule_refresh(self) -> None:
+        try:
+            interval_s = int(self._db.get_setting("auto_refresh_seconds", "30"))
+        except ValueError:
+            interval_s = 30
+        self._refresh_id = self.root.after(interval_s * 1000, self._auto_refresh)
+
+    def _auto_refresh(self) -> None:
+        """Called on main thread by root.after — kicks off DB read in background."""
+        self._run(self._auto_refresh_task)
+        self._schedule_refresh()
+
+    def _auto_refresh_task(self) -> None:
+        """Read DB and push only changed rows to the treeview."""
+        try:
+            fresh = self._db.get_all_jobs()
+            self._ui(self._update_tree_partial, fresh)
+        except Exception:
+            logging.exception("Auto-refresh task failed")
+
+    # ── Status bar ────────────────────────────────────────────────────────────
+
+    def _update_statusbar(self) -> None:
+        auth = False
+        try:
+            auth = self._cloud.is_authenticated() if self._cloud else False
+        except Exception:
+            pass
+        provider = self._config.cloud_provider.capitalize()
+        dot = "\u25cf" if auth else "\u25cb"
+        self._lbl_cloud.config(text=f"{dot} {provider}")
+        self._lbl_count.config(text=f"{len(self._jobs)} job(s)")
+        if self._session_errors:
+            self._lbl_errors.config(
+                text=f"\u26a0 {self._session_errors} error(s) \u2014 View Log")
+        else:
+            self._lbl_errors.config(text="")
+
+    def _show_error_log(self) -> None:
+        win = tk.Toplevel(self.root)
+        win.title("Error Log")
+        win.geometry("620x420")
+        win.transient(self.root)
+        txt = scrolledtext.ScrolledText(win, state="normal", wrap=tk.WORD,
+                                         font=("Courier", 9))
+        txt.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+        log_path = self._db.get_setting("log_path", "builders_qr_labels.log")
+        if os.path.isfile(log_path):
+            try:
+                with open(log_path, "r", encoding="utf-8", errors="replace") as fh:
+                    txt.insert(tk.END, fh.read())
+                txt.see(tk.END)
+            except Exception as exc:
+                txt.insert(tk.END, f"Could not read log file: {exc}")
+        else:
+            txt.insert(tk.END,
+                       "(No log file yet.\n"
+                       "File logging is added in Phase 7 via Settings → Log Path.)")
+        txt.config(state="disabled")
+
+    # ── Misc helpers ──────────────────────────────────────────────────────────
+
+    def _selected_job_ids(self) -> list[str]:
+        return list(self._tree.selection())
+
+    def _job_by_id(self, job_id: str) -> Optional[JobInfo]:
+        return next((j for j in self._jobs if j.job_id == job_id), None)
+
+
+# ════════════════════════════════════════════════════════════════════════════════
 # generate_share_qr — standalone utility (Phase 6)
 # ════════════════════════════════════════════════════════════════════════════════
 
@@ -1175,7 +1821,6 @@ def generate_share_qr(share_url: str, output_path: str) -> None:
 # ════════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
-    config = AppConfig()
-    db = JobDatabase(config.db_path)
-    log.info("DB available: %s  path: %s", db.is_available(), db._path)
-    log.info("BuildersQRLabels — Phase 2 core classes loaded. UI coming in Phase 3.")
+    root = tk.Tk()
+    app = BuildersQRLabelsApp(root)
+    root.mainloop()
