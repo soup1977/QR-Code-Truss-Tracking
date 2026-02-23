@@ -16,10 +16,10 @@
 
 | Item | Status |
 |---|---|
-| `TC - Cloud Manager 0.6.2.8.1/` | Legacy — to be moved to `legacy/`, not modified |
-| `TC - Sticker Mannager 0.7.8.3/` | Legacy — to be moved to `legacy/`, not modified |
-| `TrussyConnect.py` | To be created |
-| `requirements.txt` | To be created |
+| `legacy/TC - Cloud Manager 0.6.2.8.1/` | Done — moved to `legacy/` |
+| `legacy/TC - Sticker Mannager 0.7.8.3/` | Done — moved to `legacy/` |
+| `BuildersQRLabels.py` | To be created (Phase 2–3) |
+| `requirements.txt` | Done |
 | `CLAUDE.md` | Done |
 | `PLAN.md` | This file |
 
@@ -33,14 +33,14 @@ whether stickers have been generated or a job has been uploaded.
 
 ### Recommended approach: SQLite on a network share
 
-A single `trussy_connect.db` SQLite file stored on a shared network drive (UNC path
-like `\\SERVER\TrussyConnect\trussy_connect.db`) gives every user on the network
+A single `builders_qr_labels.db` SQLite file stored on a shared network drive (UNC path
+like `\\SERVER\BuildersQRLabels\builders_qr_labels.db`) gives every user on the network
 real-time access to the same job status data.
 
 ```
-\\SERVER\TrussyConnect\
-├── trussy_connect.db        ← shared job database (SQLite)
-└── trussy_connect.log       ← shared log file (optional)
+\\SERVER\BuildersQRLabels\
+├── builders_qr_labels.db        ← shared job database (SQLite)
+└── builders_qr_labels.log       ← shared log file (optional)
 ```
 
 Each user's machine still stores its own local `config.json` (which includes the path
@@ -72,16 +72,25 @@ all machines see near-real-time status without manual refresh.
 **Fallback:** If the network path is unavailable, the app falls back to a local
 `cache.json` and shows a warning banner. No crash.
 
-### Config stores the DB path
+### Config stores the DB path (bootstrap only)
+
+`config.json` holds only the minimum needed to connect to the shared DB. All shared path
+variables (`watch_folder`, `target_folder`, etc.) live in the DB `settings` table, not here.
 
 ```json
 {
-  "db_path": "\\\\SERVER\\TrussyConnect\\trussy_connect.db",
-  ...
+  "db_path": "\\\\SERVER\\BuildersQRLabels\\builders_qr_labels.db",
+  "cloud_provider": "dropbox",
+  "dropbox_app_key": "",
+  "dropbox_app_secret": "",
+  "onedrive_client_id": "",
+  "onedrive_tenant_id": "common",
+  "company_name": "Builders Inc.",
+  "company_address": "2644 Byington Solway Rd, Knoxville"
 }
 ```
 
-If `db_path` is empty or unreachable, the app uses a local `trussy_connect.db`.
+If `db_path` is empty or unreachable, the app uses a local `builders_qr_labels.db`.
 
 ---
 
@@ -178,7 +187,7 @@ legacy/
 token_dropbox.json
 token_onedrive.json
 config.json
-trussy_connect.db
+builders_qr_labels.db
 *.log
 __pycache__/
 *.pyc
@@ -197,22 +206,23 @@ raw dict. Writes atomically (write temp file, rename) to avoid corruption.
 
 ```python
 class AppConfig:
+    # Per-machine / bootstrap settings — stored in local config.json
+    db_path: str               # path to shared SQLite DB (or "" for local)
     cloud_provider: str        # "dropbox" or "onedrive"
     dropbox_app_key: str
     dropbox_app_secret: str
     onedrive_client_id: str
     onedrive_tenant_id: str    # defaults to "common"
-    watch_folder: str
-    target_folder: str
-    db_path: str               # path to shared SQLite DB (or "" for local)
     company_name: str
     company_address: str
-    auto_refresh_seconds: int  # how often to re-scan (default: 30)
 ```
+
+Shared path settings (below) are NOT stored here — they are read from and written to the `settings` table in `JobDatabase`.
 
 ### 2.2 — `JobDatabase`
 
 Wraps SQLite. Handles both local and network paths. Falls back gracefully.
+Owns two tables: `jobs` (job status) and `settings` (shared configuration including folder paths).
 
 ```python
 class JobDatabase:
@@ -221,6 +231,9 @@ class JobDatabase:
     def get_all_jobs(self) -> list[JobInfo]: ...
     def get_job(self, job_id: str) -> JobInfo | None: ...
     def is_available(self) -> bool: ...   # False if network path unreachable
+    # Shared settings
+    def get_setting(self, key: str, default: str = "") -> str: ...
+    def set_setting(self, key: str, value: str): ...
 ```
 
 `JobInfo` dataclass:
@@ -235,6 +248,20 @@ class JobInfo:
     last_updated: str         # ISO timestamp
     updated_by: str           # machine hostname
 ```
+
+**`settings` table schema:**
+
+```sql
+CREATE TABLE settings (
+    key          TEXT PRIMARY KEY,
+    value        TEXT,
+    last_updated TEXT,   -- ISO timestamp
+    updated_by   TEXT    -- machine hostname of last writer
+);
+```
+
+Well-known keys: `watch_folder`, `target_folder`, `auto_refresh_seconds`, `log_path`.
+`JobManager` reads these on startup and after every auto-refresh cycle.
 
 ### 2.3 — `CloudProvider` (abstract) + implementations
 
@@ -412,8 +439,13 @@ only re-renders rows that actually changed, to avoid flicker.
 │  ╚════════════════════════════════════════════════════════╝  │
 │                                                              │
 │  ╔═ Shared Database ══════════════════════════════════════╗  │
-│  ║  DB Path: [\\SERVER\TrussyConnect\trussy_connect.db]   ║  │
-│  ║  [Browse]          Status: ● Connected (12 jobs)       ║  │
+│  ║  DB Path: [\\SERVER\BuildersQRLabels\bql.db_______] [Browse] ║  │
+│  ║                   Status: ● Connected (12 jobs)        ║  │
+│  ║                                                        ║  │
+│  ║  Watch Folder:  [\\SERVER\Jobs\Watch___________] [Browse] ║  │
+│  ║  Target Folder: [\\SERVER\Jobs\Target__________] [Browse] ║  │
+│  ║  Log Path:      [\\SERVER\BuildersQRLabels\bql.log] [Browse] ║  │
+│  ║  ─ These are shared: saved to database, all machines ─ ║  │
 │  ╚════════════════════════════════════════════════════════╝  │
 │                                                              │
 │  ╔═ Company ══════════════════════════════════════════════╗  │
@@ -505,7 +537,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
-        logging.FileHandler("trussy_connect.log"),
+        logging.FileHandler("builders_qr_labels.log"),
         logging.StreamHandler()
     ]
 )
@@ -564,26 +596,30 @@ User A (generates stickers)            User B (uploads to cloud)
       ▼                                       ▼
  StickerEngine                          CloudProvider
       │                                       │
-      └──── writes ──► \\SERVER\TrussyConnect\trussy_connect.db ◄── reads ──┘
+      └──── writes ──► \\SERVER\BuildersQRLabels\builders_qr_labels.db ◄── reads ──┘
                                              │
                                      every 30 seconds
                                       all clients poll
                                       and update UI
 ```
 
-1. User A generates stickers → `JobDatabase.upsert_job()` writes sticker_status=Completed
-2. User B's auto-refresh fires → reads DB → sees job is now Completed → updates their treeview
-3. User B uploads → writes cloud_status=Uploaded
-4. User A's auto-refresh fires → sees Uploaded → row turns green
+1. Admin opens Settings → sets Watch Folder + Target Folder → `JobDatabase.set_setting()` writes to DB
+2. All other clients auto-refresh → read `watch_folder` / `target_folder` from DB → use the correct paths with no manual setup
+3. User A generates stickers → `JobDatabase.upsert_job()` writes sticker_status=Completed
+4. User B's auto-refresh fires → reads DB → sees job is now Completed → updates their treeview
+5. User B uploads → writes cloud_status=Uploaded
+6. User A's auto-refresh fires → sees Uploaded → row turns green
 
 No server process is needed — just a file on a network share.
 
 ### Setup instructions (for IT)
 
-1. Create a shared folder: `\\SERVER\TrussyConnect\`
+1. Create a shared folder: `\\SERVER\BuildersQRLabels\`
 2. Give all users Read+Write access to that folder
-3. Each user opens Settings → sets DB Path to `\\SERVER\TrussyConnect\trussy_connect.db`
-4. The app creates the DB file automatically on first run
+3. One user (admin) opens Settings → sets DB Path to `\\SERVER\BuildersQRLabels\builders_qr_labels.db`,
+   then sets Watch Folder, Target Folder, and Log Path — these are saved to the shared DB
+4. All other users only need to set DB Path; they immediately inherit the shared folder paths
+5. The app creates the DB file and tables automatically on first run
 
 ---
 
@@ -634,13 +670,13 @@ Each phase gets its own commit with a clear message.
 1. Install the **Python** and **Pylance** extensions
 2. `Ctrl+Shift+P` → "Python: Select Interpreter" → pick Python 3.10+
 3. Open terminal: `pip install -r requirements.txt`
-4. Run with `F5` or `python TrussyConnect.py` in the terminal
+4. Run with `F5` or `python BuildersQRLabels.py` in the terminal
 
 ### Visual Studio 2022
 
 1. Open **Visual Studio Installer** → Modify → check **Python development** → install
 2. `File → Open → Folder` → select this repo
-3. Right-click `TrussyConnect.py` → **Set as Startup Item**
+3. Right-click `BuildersQRLabels.py` → **Set as Startup Item**
 4. Open **Developer PowerShell** (View → Terminal): `pip install -r requirements.txt`
 5. Press `F5` to run with the debugger attached
 
