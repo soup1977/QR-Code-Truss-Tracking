@@ -510,48 +510,26 @@ Tokens cached by MSAL in `token_onedrive.json`.
 
 ---
 
-## Phase 6 — Shared QR Utility
+## Phase 6 — Shared QR Utility ✓ (folded into Phase 5)
 
-A standalone function used by both providers (not inside either provider class):
-
-```python
-def generate_share_qr(share_url: str, output_path: str) -> None:
-    qr = qrcode.QRCode(box_size=10, border=1)
-    qr.add_data(share_url)
-    qr.make(fit=True)
-    img = qr.make_image(image_factory=SvgPathImage)
-    img.save(output_path)
-```
-
-Called after a successful upload in `JobManager.upload_job()`, not inside the
-cloud provider itself.
+`generate_share_qr(share_url, output_path)` is implemented and wired into
+`JobManager.upload_job()`. No separate commit needed.
 
 ---
 
 ## Phase 7 — Logging
 
-```python
-import logging
+`configure_log_file(path)` attaches a `FileHandler` to the root logger using
+the `log_path` value from the DB `settings` table. Called on startup and
+whenever the Settings dialog is saved. The StreamHandler (console) is always
+active; the FileHandler is added/replaced dynamically.
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.FileHandler("builders_qr_labels.log"),
-        logging.StreamHandler()
-    ]
-)
-```
-
-Log levels:
+Log levels used throughout:
 - `DEBUG` — cache hits/misses, file scan details
 - `INFO` — job status changes, upload/download started/completed
 - `WARNING` — missing optional files, icon load failures, DB connection lost
 - `ERROR` — upload failures, CSV parse errors, authentication failures
 - `EXCEPTION` — unexpected errors (includes full traceback)
-
-The log file path can be set to the shared network location in Settings so all
-machines write to one log file.
 
 ---
 
