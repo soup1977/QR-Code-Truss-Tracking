@@ -9,6 +9,7 @@ config.json
 cache.json
 token_dropbox.json
 token_onedrive.json
+builders_qr_labels.db
 
 # Python
 __pycache__/

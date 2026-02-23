@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Builders Connect** (`TrussyConnect.py`) is a Windows-only desktop application for Builders Inc., a truss manufacturing company. It manages the full job workflow:
+**Builders Connect** (`BuildersQRLabels.py`) is a Windows-only desktop application for Builders Inc., a truss manufacturing company. It manages the full job workflow:
 
 1. **Validate** job folders for required files
 2. **Generate** printable QR sticker PDFs for truss identification
@@ -23,7 +23,7 @@ The app started as two separate programs (Sticker Manager and Cloud Manager) and
 |---|---|
 | `TC - Cloud Manager 0.6.2.8.1/` | Legacy — to be moved to `legacy/`, not modified |
 | `TC - Sticker Mannager 0.7.8.3/` | Legacy — to be moved to `legacy/`, not modified |
-| `TrussyConnect.py` | To be created (planned entry point) |
+| `BuildersQRLabels.py` | To be created (planned entry point) |
 | `requirements.txt` | To be created |
 
 ---
@@ -33,7 +33,7 @@ The app started as two separate programs (Sticker Manager and Cloud Manager) and
 - **OS**: Windows only (`os.startfile`, `win32print`, Windows path conventions)
 - **Python**: 3.10+
 - **GUI**: Tkinter with ttk widgets (no web framework, no Electron)
-- **Entry point**: `TrussyConnect.py` in the project root (once created)
+- **Entry point**: `BuildersQRLabels.py` in the project root (once created)
 
 **Setup:**
 ```bash
@@ -44,7 +44,7 @@ pip install -r requirements.txt
 
 **Run:**
 ```bash
-python TrussyConnect.py
+python BuildersQRLabels.py
 ```
 
 **Key dependencies:**
@@ -69,14 +69,14 @@ pywin32              — Windows printer enumeration
 ### Planned Class Structure
 
 ```
-TrussyConnect.py
+BuildersQRLabels.py
 ├── AppConfig          — loads/saves config.json; holds all user settings
 ├── CloudProvider      — abstract base for cloud integrations
 │   ├── DropboxProvider    — Dropbox SDK implementation
 │   └── OneDriveProvider   — Microsoft Graph API implementation
 ├── JobManager         — scans folders, classifies job status, manages cache
 ├── StickerEngine      — generates sticker PDFs and summary TXT files
-└── TrussyApp          — main Tkinter UI class; owns all widgets
+└── BuildersQRLabelsApp          — main Tkinter UI class; owns all widgets
     └── SettingsDialog — settings popup (credentials, paths, cloud provider)
 ```
 
@@ -171,19 +171,23 @@ Both providers must upload files, create a shareable folder link, then generate 
 
 ## Settings (config.json)
 
+`config.json` holds only **per-machine / bootstrap** settings. Shared path configuration lives in the database `settings` table so all machines stay in sync automatically.
+
 ```json
 {
+  "db_path": "\\\\SERVER\\BuildersQRLabels\\builders_qr_labels.db",
   "cloud_provider": "dropbox",
   "dropbox_app_key": "",
   "dropbox_app_secret": "",
   "onedrive_client_id": "",
   "onedrive_client_secret": "",
   "onedrive_tenant_id": "common",
-  "watch_folder": "",
-  "target_folder": "",
   "company_name": "Builders Inc.",
   "company_address": "2644 Byington Solway Rd, Knoxville"
 }
+```
+
+`watch_folder`, `target_folder`, `auto_refresh_seconds`, and the log file path are stored in the **database `settings` table** (see below), not in `config.json`.
 ```
 
 ---
@@ -219,4 +223,16 @@ Long operations (scanning, generating, uploading) run in `daemon=True` threads.
 
 ## Shared / Network Data (Phase 9 plan)
 
-For multi-machine use, store a SQLite DB on a network share. Config includes `"db_path": "\\\\SERVER\\TrussyConnect\\trussy_connect.db"`. Fall back to local `cache.json` when network is unavailable. Schema has a single `jobs` table keyed on `job_id` with sticker/cloud status columns plus `last_updated` and `updated_by`.
+For multi-machine use, store a SQLite DB on a network share. `db_path` in `config.json` is the only bootstrap setting needed; all other shared config (folder paths, refresh interval, log path) lives in the DB. Fall back to a local `builders_qr_labels.db` when the network is unavailable.
+
+**Database tables:**
+
+- `jobs` — keyed on `job_id`; holds sticker/cloud status, `last_updated`, `updated_by`
+- `settings` — key/value pairs for shared configuration:
+
+| Key | Example Value |
+|---|---|
+| `watch_folder` | `\\SERVER\Jobs\Watch` |
+| `target_folder` | `\\SERVER\Jobs\Target` |
+| `auto_refresh_seconds` | `30` |
+| `log_path` | `\\SERVER\BuildersQRLabels\builders_qr_labels.log` |
