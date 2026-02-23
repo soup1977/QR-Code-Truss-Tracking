@@ -86,7 +86,7 @@ variables (`watch_folder`, `target_folder`, etc.) live in the DB `settings` tabl
   "onedrive_client_id": "",
   "onedrive_tenant_id": "common",
   "company_name": "Builders Inc.",
-  "company_address": "2644 Byington Solway Rd, Knoxville"
+  "company_address": "17600 E. Smith Rd. Aurora, CO. 80011"
 }
 ```
 
