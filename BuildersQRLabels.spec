@@ -67,8 +67,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    # Uncomment and set path if you have an .ico file:
-    # icon="icons\\app.ico",
+    icon="icons\\trussQR.ico",
     version_info=None,
 )
 

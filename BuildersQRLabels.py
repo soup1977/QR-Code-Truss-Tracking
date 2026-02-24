@@ -1540,6 +1540,12 @@ class BuildersQRLabelsApp:
         self.root.title(f"Builders Truss QR — QR Labels  v{__version__}")
         self.root.minsize(600, 450)
         _center_window(self.root, 700, 650)
+        _ico = os.path.join("icons", "trussQR.ico")
+        if os.path.isfile(_ico):
+            try:
+                self.root.iconbitmap(_ico)
+            except Exception:
+                pass
 
         # ── Backend objects ───────────────────────────────────────────────────
         self._config  = AppConfig()
