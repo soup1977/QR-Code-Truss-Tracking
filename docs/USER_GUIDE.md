@@ -1,6 +1,6 @@
-# Builders Connect — User Guide
+# Builders Truss QR — User Guide
 
-**Builders Connect** is the QR label and cloud sync manager for Builders Inc.
+**Builders Truss QR** is the QR label and cloud sync manager for Builders Inc.
 It handles the full job workflow: validating job folders, generating QR sticker
 PDFs, and uploading completed job packages to cloud storage.
 

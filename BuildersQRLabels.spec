@@ -1,5 +1,5 @@
 # BuildersQRLabels.spec
-# PyInstaller build spec for Builders Connect.
+# PyInstaller build spec for Builders Truss QR.
 #
 # Usage (from project root, with .venv active):
 #   pyinstaller BuildersQRLabels.spec --clean --noconfirm

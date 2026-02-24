@@ -1,4 +1,4 @@
-# Builders Connect — Implementation Plan
+# Builders Truss QR — Implementation Plan
 
 ## Decisions Made
 
@@ -104,7 +104,7 @@ An IT administrator must register an application in **Microsoft Entra ID** (form
 Azure Active Directory) at `https://portal.azure.com`:
 
 - Go to: **Entra ID → App registrations → New registration**
-- Name: `Builders Connect` (or any name)
+- Name: `Builders Truss QR` (or any name)
 - Supported account types: `Accounts in this organizational directory only`
 - No redirect URI needed (we use device code flow)
 

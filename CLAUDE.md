@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Builders Connect** (`BuildersQRLabels.py`) is a Windows-only desktop application for Builders Inc., a truss manufacturing company. It manages the full job workflow:
+**Builders Truss QR** (`BuildersQRLabels.py`) is a Windows-only desktop application for Builders Inc., a truss manufacturing company. It manages the full job workflow:
 
 1. **Provision** jobs — create the cloud folder, obtain the share URL, write the QR SVG locally
 2. **Generate** printable QR sticker PDFs for truss identification

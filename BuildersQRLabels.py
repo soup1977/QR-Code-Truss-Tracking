@@ -1,5 +1,5 @@
 """
-BuildersQRLabels.py — Builders Connect QR Label & Cloud Sync Manager
+BuildersQRLabels.py — Builders Truss QR QR Label & Cloud Sync Manager
 Builders Inc. — single-file desktop application (Windows only, Python 3.10+)
 
 Entry point:  python BuildersQRLabels.py
@@ -8,7 +8,7 @@ Architecture: AppConfig → JobDatabase → JobManager → StickerEngine
               BuildersQRLabelsApp (Tkinter UI — Phase 3)
 """
 
-__version__ = "0.9.0"
+__version__ = "0.9.1"
 
 # ── Standard library ──────────────────────────────────────────────────────────
 import json
@@ -125,14 +125,14 @@ class AppConfig:
     """
 
     _DEFAULTS: dict = {
-        "db_path":             "",
-        "cloud_provider":      "dropbox",
+        "db_path":             "X:\\PROJECT\\QRCodes\\Database\\builders_qr_labels.db",
+        "cloud_provider":      "onedrive",
         "dropbox_app_key":     "",
         "dropbox_app_secret":  "",
         "onedrive_client_id":  "",
         "onedrive_tenant_id":  "common",
         "company_name":        "Builders Inc.",
-        "company_address":     "2644 Byington Solway Rd, Knoxville",
+        "company_address":     "17600 E. Smith Rd., Aurora, CO. 80011",
     }
 
     def __init__(self, config_path: str = CONFIG_FILE) -> None:
@@ -222,7 +222,7 @@ class UpdateChecker:
     version.json schema (IT maintains this file on the share):
       {
         "version": "0.9.1",
-        "installer_path": "\\\\SERVER\\BuildersQRLabels\\BuildersConnect-0.9.1-Setup.exe",
+        "installer_path": "\\\\SERVER\\BuildersQRLabels\\BuildersTrussQR-0.9.1-Setup.exe",
         "release_notes": "Bug fixes and improvements"
       }
 
@@ -1537,7 +1537,7 @@ class BuildersQRLabelsApp:
 
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        self.root.title(f"Builders Connect — QR Labels  v{__version__}")
+        self.root.title(f"Builders Truss QR — QR Labels  v{__version__}")
         self.root.minsize(600, 450)
         _center_window(self.root, 700, 650)
 

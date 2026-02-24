@@ -1,7 +1,7 @@
-# Builders Connect — Setup Guide
+# Builders Truss QR — Setup Guide
 
 This guide covers installation, first-time configuration, and multi-machine
-network setup for Builders Connect.
+network setup for Builders Truss QR.
 
 ---
 
@@ -17,7 +17,7 @@ network setup for Builders Connect.
 ## Installation
 
 1. Copy or clone the `QR-Code-Truss-Tracking` folder to each machine that will run the app.
-   A local path like `C:\BuildersConnect\` works well.
+   A local path like `C:\BuildersTrussQR\` works well.
 
 2. Open a command prompt in that folder and create a virtual environment:
 
@@ -116,9 +116,9 @@ shared database — no manual entry needed.
 1. Go to [dropbox.com/developers](https://www.dropbox.com/developers) and create an app:
    - **API**: Scoped Access
    - **Access type**: Full Dropbox
-   - Give it a name (e.g. `BuildersConnect`)
+   - Give it a name (e.g. `BuildersTrussQR`)
 2. Note the **App Key** and **App Secret** from the app's Settings page
-3. In Builders Connect → **⚙ Settings** → **Dropbox**:
+3. In Builders Truss QR → **⚙ Settings** → **Dropbox**:
    - Enter the App Key and App Secret
    - Click **Authenticate with Dropbox**
    - A browser window opens; log in and approve
@@ -136,7 +136,7 @@ OneDrive requires an Azure App Registration. Ask IT to complete these steps once
 
 1. Sign in to [portal.azure.com](https://portal.azure.com) with an admin account
 2. Go to **Microsoft Entra ID → App registrations → New registration**:
-   - Name: `Builders Connect`
+   - Name: `Builders Truss QR`
    - Supported account types: `Accounts in this organizational directory only`
    - No redirect URI needed
 3. After registration, go to **API permissions → Add a permission → Microsoft Graph → Delegated**:
@@ -147,7 +147,7 @@ OneDrive requires an Azure App Registration. Ask IT to complete these steps once
 
 #### User Setup
 
-1. In Builders Connect → **⚙ Settings** → **OneDrive**:
+1. In Builders Truss QR → **⚙ Settings** → **OneDrive**:
    - Enter the **Client ID** (Application ID from step 4 above)
    - Enter the **Tenant ID** (or leave as `common` for personal Microsoft accounts)
    - Click **Authenticate with OneDrive**

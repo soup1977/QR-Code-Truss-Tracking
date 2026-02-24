@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableDelayedExpansion
 rem ============================================================================
-rem build.bat — One-command build for Builders Connect
+rem build.bat One-command build for Builders Truss QR
 rem
 rem Requirements (on the build machine):
 rem   • Python 3.10+ with .venv set up:  python -m venv .venv
@@ -13,16 +13,23 @@ rem Usage (from project root):
 rem   build.bat
 rem
 rem Output:
-rem   dist\BuildersQRLabels\   — PyInstaller bundle
-rem   Output\BuildersConnect-0.9.0-Setup.exe — Inno Setup installer
+rem   dist\BuildersQRLabels\                      — PyInstaller bundle
+rem   Output\BuildersTrussQR-0.9.0-Portable.zip   — primary distributable (no installer needed)
+rem   Output\BuildersTrussQR-0.9.0-Setup.exe      — Inno Setup installer (optional, if ISCC found)
+rem   Output\version.json                         — copy to network share alongside the ZIP
 rem ============================================================================
 
-set VERSION=0.9.0
-set ISCC_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe
+set VERSION=0.9.1
+set ISCC_PATH=C:\Users\craig\AppData\Local\Programs\Inno Setup 6\ISCC.exe
+
+rem ── Network share path where the ZIP and version.json will be deployed ───────
+rem    Must match the folder containing db_path in config.json on all machines.
+rem    Trailing backslash required.
+set SHARE_PATH=X:\PROJECT\QRCodes\Database\
 
 echo.
 echo ============================================================
-echo  Building Builders Connect v%VERSION%
+echo  Building Builders Truss QR v%VERSION%
 echo ============================================================
 echo.
 
@@ -34,41 +41,67 @@ if exist ".venv\Scripts\activate.bat" (
 )
 
 rem ── Step 1: PyInstaller ─────────────────────────────────────────────────────
-echo [1/2] PyInstaller — building standalone bundle...
+echo [1/4] PyInstaller — building standalone bundle...
 pyinstaller BuildersQRLabels.spec --clean --noconfirm
 if !errorlevel! neq 0 (
     echo.
     echo [ERROR] PyInstaller failed. Check output above.
     exit /b 1
 )
-echo [1/2] PyInstaller complete.
+echo [1/4] PyInstaller complete.
 echo.
 
-rem ── Step 2: Inno Setup ──────────────────────────────────────────────────────
-echo [2/2] Inno Setup — building installer...
+rem ── Step 2: Inno Setup (optional — skipped if ISCC not found) ───────────────
+echo [2/4] Inno Setup — building installer (optional)...
 if not exist "%ISCC_PATH%" (
-    echo [ERROR] Inno Setup not found at: %ISCC_PATH%
-    echo         Install Inno Setup 6 from https://jrsoftware.org/isinfo.php
-    exit /b 1
+    echo [SKIP] Inno Setup not found at: %ISCC_PATH% — skipping installer build.
+    echo        Install Inno Setup 6 from https://jrsoftware.org/isinfo.php if needed.
+) else (
+    "%ISCC_PATH%" installer\BuildersQRLabels.iss
+    if !errorlevel! neq 0 (
+        echo.
+        echo [ERROR] Inno Setup failed. Check output above.
+        exit /b 1
+    )
+    echo [2/4] Inno Setup complete.
 )
-"%ISCC_PATH%" installer\BuildersQRLabels.iss
+echo.
+
+rem ── Step 3: ZIP portable bundle ─────────────────────────────────────────────
+echo [3/4] Zipping portable bundle...
+if not exist "Output" mkdir Output
+powershell -NoProfile -Command "Compress-Archive -Force -Path 'dist\BuildersQRLabels\*' -DestinationPath 'Output\BuildersTrussQR-%VERSION%-Portable.zip'"
 if !errorlevel! neq 0 (
     echo.
-    echo [ERROR] Inno Setup failed. Check output above.
+    echo [ERROR] ZIP failed. Check output above.
     exit /b 1
 )
-echo [2/2] Inno Setup complete.
+echo [3/4] ZIP complete.
+echo.
+
+rem ── Step 4: Generate version.json ───────────────────────────────────────────
+echo [4/4] Generating version.json...
+powershell -NoProfile -Command "[ordered]@{version='%VERSION%';installer_path='%SHARE_PATH%BuildersTrussQR-%VERSION%-Portable.zip';release_notes=''} | ConvertTo-Json | Set-Content -Encoding UTF8 'Output\version.json'"
+if !errorlevel! neq 0 (
+    echo.
+    echo [ERROR] version.json generation failed.
+    exit /b 1
+)
+echo [4/4] version.json complete.
 echo.
 
 rem ── Done ────────────────────────────────────────────────────────────────────
 echo ============================================================
 echo  BUILD COMPLETE
-echo  Output\BuildersConnect-%VERSION%-Setup.exe
+echo  Output\BuildersTrussQR-%VERSION%-Portable.zip  (distribute this)
+echo  Output\version.json                            (deploy alongside ZIP)
+echo  Output\BuildersTrussQR-%VERSION%-Setup.exe     (if Inno Setup ran)
 echo ============================================================
 echo.
 echo Next steps:
-echo   1. Copy Output\BuildersConnect-%VERSION%-Setup.exe to the network share
-echo   2. Update \\SERVER\BuildersQRLabels\version.json with the new version
-echo   3. Run the installer on target machines
-echo.
-exit /b 0
+echo   1. Fill in "release_notes" in Output\version.json
+echo   2. Copy both files to %SHARE_PATH%
+echo   3. Users: extract the ZIP anywhere and run BuildersQRLabels.exe
+echo
+pause
+rem exit /b 0
