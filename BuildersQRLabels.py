@@ -1091,8 +1091,8 @@ class JobManager:
 
     def upload_job(self, job_id: str, cloud: CloudProvider) -> None:
         """
-        Upload all local files from the jobs folder to the already-provisioned cloud folder.
-        Skips {job_id}_JOB_* files.
+        Upload local files from the jobs folder to the already-provisioned cloud folder.
+        Only uploads *.pdf files, excluding Stickers_{job_id}.pdf and {job_id}_JOB_* files.
         """
         folder = self.jobs_folder
         if not folder:
@@ -1104,7 +1104,13 @@ class JobManager:
         cloud_folder = cloud.ensure_folder(job_id)
 
         for fname in os.listdir(job_folder):
+            if not fname.lower().endswith(".pdf"):
+                log.debug("Skipping non-PDF file: %s", fname)
+                continue
             if re.match(rf"{re.escape(job_id)}_JOB_", fname, flags=re.IGNORECASE):
+                continue
+            if fname.lower() == f"stickers_{job_id}.pdf".lower():
+                log.debug("Skipping sticker PDF (not uploaded): %s", fname)
                 continue
             fpath = os.path.join(job_folder, fname)
             if os.path.isfile(fpath):
@@ -1211,14 +1217,15 @@ class StickerEngine:
         """
         Parse CSV, filter to job_id rows.
         Returns (list_of_truss_dicts, error_message_or_None).
-        Each dict: trsname, trusstype, batch, customer, jobname, qty, ply.
+        Each dict: label, type, batch, customer, jobname, qty, plies.
+        Batch is extracted from "JobNumber-BatchNumber" form — only BatchNumber is kept.
         """
         try:
             df = pd.read_csv(csv_path)
             df.columns = df.columns.str.lower().str.strip()
 
-            required = {"jobnumber", "trsname", "trusstype", "batch",
-                        "customer", "jobname", "qty", "ply"}
+            required = {"jobnumber", "label", "type", "batch",
+                        "customer", "jobname", "qty", "plies"}
             missing = required - set(df.columns)
             if missing:
                 return [], f"Missing columns: {', '.join(sorted(missing))}"
@@ -1230,22 +1237,25 @@ class StickerEngine:
 
             trusses = []
             for _, row in df.iterrows():
+                raw_batch = str(row["batch"]).strip()
+                # Batch is "JobNumber-BatchNumber" — keep only the BatchNumber part
+                batch_code = raw_batch.rsplit("-", 1)[-1]
                 trusses.append({
-                    "trsname":   str(row["trsname"]).strip(),
-                    "trusstype": str(row["trusstype"]).strip(),
-                    "batch":     str(row["batch"]).strip(),
-                    "customer":  str(row["customer"]).strip()[:25],
-                    "jobname":   str(row["jobname"]).strip()[:25],
-                    "qty":       int(row["qty"]),
-                    "ply":       int(row["ply"]),
+                    "label":    str(row["label"]).strip(),
+                    "type":     str(row["type"]).strip(),
+                    "batch":    batch_code,
+                    "customer": str(row["customer"]).strip()[:25],
+                    "jobname":  str(row["jobname"]).strip()[:25],
+                    "qty":      int(row["qty"]),
+                    "plies":    int(row["plies"]),
                 })
             return trusses, None
         except Exception as exc:
             logging.exception("CSV parse error: %s", csv_path)
             return [], str(exc)
 
-    def calculate_sticker_count(self, qty: int, ply: int) -> int:
-        return qty if ply == 1 else qty * ply
+    def calculate_sticker_count(self, qty: int, plies: int) -> int:
+        return qty if plies == 1 else qty * plies
 
     # ── PDF generation ────────────────────────────────────────────────────────
 
@@ -1267,13 +1277,13 @@ class StickerEngine:
         c = PDFCanvas(pdf_path, pagesize=(self.STICKER_W, self.STICKER_H))
 
         for truss in trusses:
-            is_ply = truss["ply"] > 1
+            is_ply = truss["plies"] > 1
             label_char = "P" if is_ply else "Q"
-            count = self.calculate_sticker_count(truss["qty"], truss["ply"])
+            count = self.calculate_sticker_count(truss["qty"], truss["plies"])
             for idx in range(1, count + 1):
                 sticker_type = f"{label_char}{idx:02d}/{count:02d}"
                 token_data = self._register_sticker_token(
-                    job_id, truss["trsname"], sticker_type
+                    job_id, truss["label"], sticker_type
                 )
                 self._draw_sticker(
                     c,
@@ -1331,7 +1341,7 @@ class StickerEngine:
         # ── Right QR — token data ─────────────────────────────────────────────
         right_qr_x = W - qs - m
         right_qr_y = 4 * mm
-        qr_data = f"{truss['batch']}|{truss['trsname']}|{sticker_type}|{token}"
+        qr_data = f"{truss['batch']}|{truss['label']}|{sticker_type}|{token}"
         tmp_png: Optional[str] = None
         try:
             qr = qrcode.QRCode(
@@ -1376,8 +1386,8 @@ class StickerEngine:
         c.setFont("Helvetica", 7)
         c.drawCentredString(tx_center, row2_y, truss["jobname"])
 
-        # Large truss code (trsname) centered in the QR zone
-        code = truss["trsname"]
+        # Large truss code (label) centered in the QR zone
+        code = truss["label"]
         code_len = len(code)
         if code_len <= 4:
             font_size = 48
@@ -1414,17 +1424,16 @@ class StickerEngine:
         rows: list[str] = [header, sep]
 
         for truss in trusses:
-            is_ply = truss["ply"] > 1
+            is_ply = truss["plies"] > 1
             label_char = "P" if is_ply else "Q"
-            count = self.calculate_sticker_count(truss["qty"], truss["ply"])
-            batch_display = str(truss["batch"])[-2:]
+            count = self.calculate_sticker_count(truss["qty"], truss["plies"])
             for idx in range(1, count + 1):
                 label = f"{label_char}{idx:02d}/{count:02d}"
-                key = f"{job_id}|{truss['trsname']}|{label}"
+                key = f"{job_id}|{truss['label']}|{label}"
                 token = self._tokens.get(key, {}).get("token", "")
                 rows.append(
-                    f"| {job_id} | {truss['trsname']:<8} | {truss['trusstype']:<12} "
-                    f"| {label:<9} | {token:<12} | {batch_display:<5} | No     |"
+                    f"| {job_id} | {truss['label']:<8} | {truss['type']:<12} "
+                    f"| {label:<9} | {token:<12} | {truss['batch']:<5} | No     |"
                 )
             if is_ply:
                 ply_total += count
@@ -1445,9 +1454,9 @@ class StickerEngine:
     # ── Token management ──────────────────────────────────────────────────────
 
     def _register_sticker_token(
-        self, job_id: str, trsname: str, sticker_type: str, token: str = ""
+        self, job_id: str, label: str, sticker_type: str, token: str = ""
     ) -> dict:
-        key = f"{job_id}|{trsname}|{sticker_type}"
+        key = f"{job_id}|{label}|{sticker_type}"
         if key not in self._tokens:
             self._tokens[key] = {
                 "token":     token or uuid.uuid4().hex[:12],
@@ -1473,12 +1482,12 @@ class StickerEngine:
                     parts = [p.strip() for p in line.split("|")]
                     if len(parts) < 7:
                         continue
-                    row_job = parts[1]
-                    trsname = parts[2]
-                    label   = parts[4]
-                    token   = parts[5]
+                    row_job      = parts[1]
+                    truss_label  = parts[2]
+                    sticker_type = parts[4]
+                    token        = parts[5]
                     if JOB_ID_RE.match(row_job) and row_job == job_id and token:
-                        self._register_sticker_token(row_job, trsname, label, token)
+                        self._register_sticker_token(row_job, truss_label, sticker_type, token)
                         recovered += 1
         except Exception:
             logging.exception("Token recovery failed for %s", summary_path)
@@ -1745,6 +1754,12 @@ class BuildersQRLabelsApp:
                                      fg="#c62828", cursor="hand2")
         self._lbl_errors.pack(side=tk.RIGHT, padx=6)
         self._lbl_errors.bind("<Button-1>", lambda _e: self._show_error_log())
+
+        self._progress_bar = ttk.Progressbar(
+            parent, mode="determinate", length=120, maximum=1, value=0)
+        self._progress_bar.pack(side=tk.RIGHT, padx=(0, 4))
+        self._lbl_progress = tk.Label(parent, text="", **lbl)
+        self._lbl_progress.pack(side=tk.RIGHT)
 
     def _setup_banner(self, parent: tk.Frame) -> None:
         for fname in ("banner.png", "banner.jpg",
@@ -2162,8 +2177,10 @@ class BuildersQRLabelsApp:
         if self._cloud is None:
             self._ui(messagebox.showwarning, "Provision", "Cloud provider is not available.")
             return
+        n = len(job_ids)
+        self._ui(self._set_progress, "Provisioning…", 0, n)
         success, errors = 0, []
-        for job_id in job_ids:
+        for i, job_id in enumerate(job_ids, 1):
             try:
                 self._manager.provision_job(job_id, self._cloud)
                 job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
@@ -2184,6 +2201,8 @@ class BuildersQRLabelsApp:
                 self._db.upsert_job(err_job)
                 _ej = err_job
                 self._ui(lambda j=_ej: self._update_job_row(j))
+            self._ui(self._set_progress, f"Provisioning {i} of {n}…", i, n)
+        self._ui(self._clear_progress)
         self._ui(self._update_statusbar)
         msg = f"Provisioned {success} job(s) successfully."
         if errors:
@@ -2216,7 +2235,9 @@ class BuildersQRLabelsApp:
                 self._ui(messagebox.showwarning, "Process All",
                          "Cloud provider unavailable — skipping provision.")
             else:
-                for job_id in to_provision:
+                n = len(to_provision)
+                self._ui(self._set_progress, "Provisioning…", 0, n)
+                for i, job_id in enumerate(to_provision, 1):
                     try:
                         self._manager.provision_job(job_id, self._cloud)
                         job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
@@ -2229,36 +2250,41 @@ class BuildersQRLabelsApp:
                     except Exception:
                         logging.exception("Provision failed for %s", job_id)
                         self._session_errors += 1
+                    self._ui(self._set_progress, f"Provisioning {i} of {n}…", i, n)
 
         # After provisioning, the freshly-provisioned jobs become eligible for generation
         all_to_generate = list(dict.fromkeys(to_provision + to_generate))
         folder = self._manager.jobs_folder
-        for job_id in all_to_generate:
-            if not folder:
-                break
-            job_path = os.path.join(folder, job_id)
-            try:
-                self._engine.generate_pdf(job_path)
-                qty = JobManager._read_qty_from_summary(
-                    os.path.join(job_path, f"{job_id}_Stickers_Summary.txt"))
-                job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
-                job.sticker_status = "Completed"
-                job.sticker_qty    = qty
-                if job.cloud_status not in ("Uploaded", "Cloud Only"):
-                    job.cloud_status   = "Local"
-                    job.cloud_progress = "66%"
-                job.last_updated = datetime.now().isoformat(timespec="seconds")
-                self._db.upsert_job(job)
-                _j = job
-                self._ui(lambda j=_j: self._update_job_row(j))
-            except Exception:
-                logging.exception("Generate failed for %s", job_id)
-                self._session_errors += 1
+        if all_to_generate and folder:
+            n = len(all_to_generate)
+            self._ui(self._set_progress, "Generating…", 0, n)
+            for i, job_id in enumerate(all_to_generate, 1):
+                job_path = os.path.join(folder, job_id)
+                try:
+                    self._engine.generate_pdf(job_path)
+                    qty = JobManager._read_qty_from_summary(
+                        os.path.join(job_path, f"{job_id}_Stickers_Summary.txt"))
+                    job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
+                    job.sticker_status = "Completed"
+                    job.sticker_qty    = qty
+                    if job.cloud_status not in ("Uploaded", "Cloud Only"):
+                        job.cloud_status   = "Local"
+                        job.cloud_progress = "66%"
+                    job.last_updated = datetime.now().isoformat(timespec="seconds")
+                    self._db.upsert_job(job)
+                    _j = job
+                    self._ui(lambda j=_j: self._update_job_row(j))
+                except Exception:
+                    logging.exception("Generate failed for %s", job_id)
+                    self._session_errors += 1
+                self._ui(self._set_progress, f"Generating {i} of {n}…", i, n)
 
         # Upload all eligible jobs (original to_upload list + newly generated)
         all_to_upload = list(dict.fromkeys(to_upload + all_to_generate))
         if all_to_upload and self._cloud and self._cloud.is_authenticated():
-            for job_id in all_to_upload:
+            n = len(all_to_upload)
+            self._ui(self._set_progress, "Uploading…", 0, n)
+            for i, job_id in enumerate(all_to_upload, 1):
                 try:
                     self._manager.upload_job(job_id, self._cloud)
                     job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
@@ -2271,7 +2297,9 @@ class BuildersQRLabelsApp:
                 except Exception:
                     logging.exception("Upload failed for %s", job_id)
                     self._session_errors += 1
+                self._ui(self._set_progress, f"Uploading {i} of {n}…", i, n)
 
+        self._ui(self._clear_progress)
         self._ui(self._update_statusbar)
 
     def _generate_task(self, job_ids: list[str]) -> None:
@@ -2281,8 +2309,10 @@ class BuildersQRLabelsApp:
                      "Jobs folder is not configured.")
             return
 
+        n = len(job_ids)
+        self._ui(self._set_progress, "Generating…", 0, n)
         success_ids, errors = [], []
-        for job_id in job_ids:
+        for i, job_id in enumerate(job_ids, 1):
             job_path = os.path.join(folder, job_id)
             try:
                 self._engine.generate_pdf(job_path)
@@ -2310,7 +2340,9 @@ class BuildersQRLabelsApp:
                 self._db.upsert_job(err_job)
                 _ej = err_job
                 self._ui(lambda j=_ej: self._update_job_row(j))
+            self._ui(self._set_progress, f"Generating {i} of {n}…", i, n)
 
+        self._ui(self._clear_progress)
         self._ui(self._update_statusbar)
         if errors:
             msg = f"Generated {len(success_ids)} job(s).\n\nErrors ({len(errors)}):\n" + "\n".join(errors)
@@ -2336,8 +2368,10 @@ class BuildersQRLabelsApp:
         if self._cloud is None:
             self._ui(messagebox.showwarning, "Upload", "Cloud provider is not available.")
             return
+        n = len(job_ids)
+        self._ui(self._set_progress, "Uploading…", 0, n)
         success, errors = 0, []
-        for job_id in job_ids:
+        for i, job_id in enumerate(job_ids, 1):
             try:
                 self._manager.upload_job(job_id, self._cloud)
                 job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
@@ -2358,6 +2392,8 @@ class BuildersQRLabelsApp:
                 self._db.upsert_job(err_job)
                 _ej = err_job
                 self._ui(lambda j=_ej: self._update_job_row(j))
+            self._ui(self._set_progress, f"Uploading {i} of {n}…", i, n)
+        self._ui(self._clear_progress)
         self._ui(self._update_statusbar)
         msg = f"Uploaded {success} job(s) successfully."
         if errors:
@@ -2427,6 +2463,16 @@ class BuildersQRLabelsApp:
             logging.exception("Auto-refresh task failed")
 
     # ── Status bar ────────────────────────────────────────────────────────────
+
+    def _set_progress(self, text: str, value: int, maximum: int) -> None:
+        """Update the status bar progress indicator. Must run on the main thread."""
+        self._lbl_progress.config(text=text)
+        self._progress_bar.config(maximum=max(maximum, 1), value=value)
+
+    def _clear_progress(self) -> None:
+        """Reset the progress indicator after a task completes."""
+        self._lbl_progress.config(text="")
+        self._progress_bar.config(value=0)
 
     def _update_statusbar(self) -> None:
         auth = False
