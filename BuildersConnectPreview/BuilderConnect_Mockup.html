@@ -1,0 +1,2240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BuilderConnect — Builders Warehouse</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap');
+
+  /* ── RESET & BASE ─────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red:       #C8102E;
+    --red-dark:  #8B0000;
+    --red-dim:   rgba(200,16,46,0.08);
+    --black:     #111111;
+    --charcoal:  #1E1E1E;
+    --steel:     #2A2A2A;
+    --mid:       #3D3D3D;
+    --muted:     #6B6B6B;
+    --border:    #2F2F2F;
+    --surface:   #1A1A1A;
+    --card:      #222222;
+    --text:      #E8E8E8;
+    --text-dim:  #9A9A9A;
+    --white:     #FFFFFF;
+    --green:     #2ECC71;
+    --amber:     #F39C12;
+    --blue:      #3498DB;
+    --sidebar-w: 240px;
+    --header-h:  60px;
+  }
+
+  html { font-size: 14px; }
+
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: var(--black);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── LAYOUT ───────────────────────────────────────── */
+  .app { display: flex; height: 100vh; overflow: hidden; }
+
+  /* ── SIDEBAR ──────────────────────────────────────── */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: var(--charcoal);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    z-index: 10;
+  }
+
+  .sidebar-logo {
+    padding: 0 20px;
+    height: var(--header-h);
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    gap: 10px;
+  }
+
+  .logo-mark {
+    width: 32px; height: 32px;
+    background: var(--red);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800; font-size: 18px; color: white;
+    flex-shrink: 0;
+    clip-path: polygon(0 0, 88% 0, 100% 12%, 100% 100%, 12% 100%, 0 88%);
+  }
+
+  .logo-text { line-height: 1.1; }
+  .logo-text .name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 15px;
+    color: var(--white); letter-spacing: 0.5px;
+  }
+  .logo-text .sub {
+    font-size: 10px; color: var(--red);
+    font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;
+  }
+
+  .sidebar-section { padding: 18px 12px 6px; }
+  .sidebar-section-label {
+    font-size: 9px; font-weight: 600; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--muted);
+    padding: 0 8px; margin-bottom: 4px;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: 6px;
+    cursor: pointer; transition: all 0.15s;
+    color: var(--text-dim); font-size: 13px; font-weight: 500;
+    position: relative;
+  }
+  .nav-item:hover { background: var(--steel); color: var(--text); }
+  .nav-item.active { background: var(--red-dim); color: var(--white); }
+  .nav-item.active::before {
+    content: ''; position: absolute; left: 0; top: 6px; bottom: 6px;
+    width: 3px; background: var(--red); border-radius: 0 2px 2px 0;
+  }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.7; }
+  .nav-item.active svg { opacity: 1; }
+
+  .nav-badge {
+    margin-left: auto; background: var(--red);
+    color: white; font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 10px; min-width: 18px; text-align: center;
+  }
+
+  .sidebar-footer {
+    margin-top: auto; padding: 12px; border-top: 1px solid var(--border);
+  }
+  .user-chip {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 6px;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .user-chip:hover { background: var(--steel); }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--red-dark), var(--red));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: white; flex-shrink: 0;
+  }
+  .user-info .user-name { font-size: 12px; font-weight: 600; color: var(--text); }
+  .user-info .user-role { font-size: 10px; color: var(--text-dim); }
+
+  /* ── MAIN AREA ────────────────────────────────────── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ── TOPBAR ───────────────────────────────────────── */
+  .topbar {
+    height: var(--header-h); background: var(--charcoal);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 24px; gap: 16px; flex-shrink: 0;
+  }
+
+  .page-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 20px; letter-spacing: 0.5px;
+    color: var(--white);
+  }
+
+  .breadcrumb {
+    font-size: 12px; color: var(--text-dim);
+    display: flex; align-items: center; gap: 6px; margin-left: 4px;
+  }
+  .breadcrumb span.sep { color: var(--border); }
+  .breadcrumb span.current { color: var(--text); }
+
+  .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+  .btn {
+    padding: 7px 16px; border-radius: 5px; border: none;
+    cursor: pointer; font-family: 'Barlow', sans-serif;
+    font-size: 12px; font-weight: 600; transition: all 0.15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-primary { background: var(--red); color: white; }
+  .btn-primary:hover { background: var(--red-dark); }
+  .btn-ghost {
+    background: transparent; color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--muted); color: var(--text); background: var(--steel); }
+
+  .search-box {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--steel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 0 12px; height: 34px;
+    transition: border-color 0.15s;
+  }
+  .search-box:focus-within { border-color: var(--red); }
+  .search-box input {
+    background: none; border: none; outline: none;
+    color: var(--text); font-family: 'Barlow', sans-serif;
+    font-size: 12px; width: 180px;
+  }
+  .search-box input::placeholder { color: var(--muted); }
+  .search-box svg { color: var(--muted); width: 14px; height: 14px; }
+
+  /* ── CONTENT ──────────────────────────────────────── */
+  .content {
+    flex: 1; overflow-y: auto; padding: 24px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .content::-webkit-scrollbar { width: 6px; }
+  .content::-webkit-scrollbar-track { background: transparent; }
+  .content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── STAT CARDS ───────────────────────────────────── */
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 18px 20px;
+    position: relative; overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .stat-card:hover { border-color: var(--mid); }
+  .stat-card::after {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+    background: var(--red);
+  }
+  .stat-card.green::after { background: var(--green); }
+  .stat-card.amber::after { background: var(--amber); }
+  .stat-card.blue::after  { background: var(--blue); }
+
+  .stat-label { font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--text-dim); margin-bottom: 10px; }
+  .stat-value {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 36px; font-weight: 700; color: var(--white);
+    line-height: 1; margin-bottom: 6px;
+  }
+  .stat-sub { font-size: 11px; color: var(--text-dim); }
+  .stat-sub .up { color: var(--green); }
+  .stat-sub .warn { color: var(--amber); }
+
+  /* ── PANELS ───────────────────────────────────────── */
+  .panel-row { display: grid; grid-template-columns: 1fr 360px; gap: 14px; }
+  .panel {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden;
+  }
+  .panel-header {
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 15px; font-weight: 700; letter-spacing: 0.5px;
+    color: var(--white);
+  }
+  .panel-link { font-size: 11px; color: var(--red); cursor: pointer; font-weight: 600; }
+  .panel-link:hover { text-decoration: underline; }
+
+  /* ── JOBS TABLE ───────────────────────────────────── */
+  .jobs-table { width: 100%; border-collapse: collapse; }
+  .jobs-table thead tr {
+    border-bottom: 1px solid var(--border);
+  }
+  .jobs-table th {
+    padding: 10px 18px; text-align: left;
+    font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .jobs-table td {
+    padding: 12px 18px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 12px; color: var(--text-dim);
+    vertical-align: middle;
+  }
+  .jobs-table tr:last-child td { border-bottom: none; }
+  .jobs-table tr:hover td { background: rgba(255,255,255,0.02); color: var(--text); }
+  .jobs-table tr { cursor: pointer; transition: background 0.1s; }
+
+  .job-num { color: var(--white); font-weight: 600; font-size: 13px; }
+  .job-name { color: var(--text); }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 4px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.5px;
+  }
+  .badge-green  { background: rgba(46,204,113,0.15); color: #2ECC71; }
+  .badge-amber  { background: rgba(243,156,18,0.15);  color: #F39C12; }
+  .badge-blue   { background: rgba(52,152,219,0.15);  color: #5DADE2; }
+  .badge-red    { background: rgba(200,16,46,0.15);   color: #E74C3C; }
+  .badge-gray   { background: rgba(255,255,255,0.08); color: #9A9A9A; }
+
+  .doc-icons { display: flex; gap: 4px; }
+  .doc-icon {
+    width: 24px; height: 24px; border-radius: 4px;
+    background: var(--steel); display: flex; align-items: center; justify-content: center;
+    font-size: 8px; font-weight: 700; color: var(--text-dim); letter-spacing: 0;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .doc-icon:hover { background: var(--red); color: white; }
+
+  /* ── ACTIVITY FEED ────────────────────────────────── */
+  .activity-list { padding: 4px 0; }
+  .activity-item {
+    padding: 12px 18px; display: flex; gap: 12px; align-items: flex-start;
+    border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.1s;
+    cursor: default;
+  }
+  .activity-item:last-child { border-bottom: none; }
+  .activity-item:hover { background: rgba(255,255,255,0.02); }
+
+  .activity-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
+  }
+  .dot-red   { background: var(--red); }
+  .dot-green { background: var(--green); }
+  .dot-amber { background: var(--amber); }
+  .dot-blue  { background: var(--blue); }
+
+  .activity-text { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+  .activity-text strong { color: var(--text); font-weight: 600; }
+  .activity-time { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  /* ── RFI PANEL ────────────────────────────────────── */
+  .rfi-list { padding: 0; }
+  .rfi-item {
+    padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    cursor: pointer; transition: background 0.1s;
+  }
+  .rfi-item:last-child { border-bottom: none; }
+  .rfi-item:hover { background: rgba(255,255,255,0.02); }
+  .rfi-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .rfi-id { font-size: 10px; font-weight: 700; color: var(--red); letter-spacing: 1px; }
+  .rfi-title { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .rfi-meta { font-size: 11px; color: var(--text-dim); }
+
+  /* ── JOB DETAIL VIEW ──────────────────────────────── */
+  .detail-view { display: none; }
+  .detail-view.active { display: flex; flex-direction: column; gap: 20px; }
+  .jobs-view { display: flex; flex-direction: column; gap: 20px; }
+  .jobs-view.hidden { display: none; }
+
+  .job-hero {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 24px;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 20px;
+  }
+  .job-hero-left h1 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 28px; font-weight: 800; color: var(--white);
+    margin-bottom: 4px;
+  }
+  .job-hero-left .job-client { font-size: 13px; color: var(--text-dim); margin-bottom: 14px; }
+  .job-meta-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .meta-chip {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--steel); border: 1px solid var(--border);
+    border-radius: 5px; padding: 5px 10px;
+    font-size: 11px; color: var(--text-dim);
+  }
+  .meta-chip strong { color: var(--text); font-weight: 600; }
+
+  .job-hero-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+  .tab {
+    padding: 10px 20px; cursor: pointer; font-size: 12px; font-weight: 600;
+    color: var(--text-dim); border-bottom: 2px solid transparent;
+    margin-bottom: -1px; transition: all 0.15s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--white); border-bottom-color: var(--red); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── TRUSS GRID ───────────────────────────────────── */
+  .truss-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px; padding: 18px;
+  }
+  .truss-card {
+    background: var(--steel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px; cursor: pointer;
+    transition: all 0.15s; text-align: center;
+  }
+  .truss-card:hover { border-color: var(--red); background: rgba(200,16,46,0.06); }
+  .truss-code {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 26px; font-weight: 800; color: var(--white);
+    margin-bottom: 4px;
+  }
+  .truss-type { font-size: 10px; color: var(--text-dim); margin-bottom: 8px; }
+  .truss-qty { font-size: 11px; color: var(--muted); }
+  .qr-mini {
+    width: 40px; height: 40px; margin: 8px auto 0;
+    background: white; border-radius: 3px;
+    display: grid; grid-template-columns: repeat(7,1fr); gap: 1px; padding: 4px;
+  }
+  .qr-mini div { background: black; border-radius: 0.5px; }
+  .qr-mini div.w { background: white; }
+
+  /* ── DOCUMENTS LIST ───────────────────────────────── */
+  .doc-list { padding: 6px 0; }
+  .doc-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 18px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    cursor: pointer; transition: background 0.1s;
+  }
+  .doc-row:last-child { border-bottom: none; }
+  .doc-row:hover { background: rgba(255,255,255,0.02); }
+  .doc-file-icon {
+    width: 36px; height: 36px; border-radius: 6px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700;
+  }
+  .icon-pdf  { background: rgba(200,16,46,0.15); color: var(--red); }
+  .icon-dwg  { background: rgba(52,152,219,0.15); color: var(--blue); }
+  .icon-eng  { background: rgba(46,204,113,0.15); color: var(--green); }
+  .doc-info { flex: 1; }
+  .doc-info .doc-name { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .doc-info .doc-meta { font-size: 11px; color: var(--text-dim); }
+  .doc-dl-btn {
+    padding: 5px 12px; background: var(--steel);
+    border: 1px solid var(--border); border-radius: 4px;
+    font-size: 11px; color: var(--text-dim); cursor: pointer;
+    transition: all 0.15s;
+  }
+  .doc-dl-btn:hover { background: var(--red); border-color: var(--red); color: white; }
+
+  /* ── RFI FULL VIEW ────────────────────────────────── */
+  .rfi-full-list { padding: 0; }
+  .rfi-full-item {
+    margin: 16px; background: var(--steel);
+    border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+  }
+  .rfi-full-header {
+    padding: 12px 16px; background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .rfi-thread { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .rfi-msg { display: flex; gap: 10px; }
+  .rfi-msg-avatar {
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: white;
+  }
+  .avatar-cust { background: linear-gradient(135deg, #444, #666); }
+  .avatar-bw   { background: linear-gradient(135deg, var(--red-dark), var(--red)); }
+  .rfi-bubble {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 6px; padding: 10px 14px; flex: 1;
+  }
+  .rfi-bubble .sender { font-size: 11px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .rfi-bubble .message { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+  .rfi-bubble .ts { font-size: 10px; color: var(--muted); margin-top: 6px; }
+
+  /* ── SUBMITTAL VIEW ───────────────────────────────── */
+  .submittal-list { padding: 0; }
+  .submittal-row {
+    display: flex; align-items: center; gap: 16px;
+    padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    cursor: pointer; transition: background 0.1s;
+  }
+  .submittal-row:last-child { border-bottom: none; }
+  .submittal-row:hover { background: rgba(255,255,255,0.02); }
+  .sub-num { font-size: 10px; font-weight: 700; color: var(--red); width: 60px; flex-shrink: 0; }
+  .sub-info { flex: 1; }
+  .sub-info .sub-title { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .sub-info .sub-meta  { font-size: 11px; color: var(--text-dim); }
+  .sub-status { width: 130px; flex-shrink: 0; text-align: right; }
+
+  /* ── MOBILE PREVIEW ───────────────────────────────── */
+  .mobile-preview-wrap {
+    position: fixed; right: 24px; bottom: 24px; z-index: 100;
+  }
+  .mobile-toggle {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: var(--red); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px rgba(200,16,46,0.4); transition: transform 0.2s;
+  }
+  .mobile-toggle:hover { transform: scale(1.1); }
+  .mobile-toggle svg { color: white; width: 22px; height: 22px; }
+
+  .mobile-panel {
+    position: absolute; bottom: 60px; right: 0;
+    width: 280px;
+    background: var(--charcoal); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    display: none;
+  }
+  .mobile-panel.open { display: block; animation: slideUp 0.2s ease; }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .phone-frame {
+    background: #0A0A0A;
+    border-radius: 10px; margin: 10px; padding: 10px;
+    font-size: 11px; color: var(--text);
+  }
+  .phone-status { font-size: 9px; color: var(--muted); text-align: center; padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+  .phone-header { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+  .phone-logo { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 16px; color: var(--red); }
+  .phone-greeting { font-size: 10px; color: var(--muted); }
+  .phone-jobs { display: flex; flex-direction: column; gap: 6px; }
+  .phone-job {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .phone-job-num { font-size: 12px; font-weight: 700; color: var(--white); }
+  .phone-job-name { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+  .phone-scan-btn {
+    margin-top: 10px; width: 100%; padding: 8px;
+    background: var(--red); border: none; border-radius: 6px;
+    color: white; font-family: 'Barlow', sans-serif;
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+
+  /* ── VIEW SWITCHER ────────────────────────────────── */
+  .view-pill {
+    display: flex; background: var(--steel);
+    border: 1px solid var(--border); border-radius: 6px; padding: 2px;
+  }
+  .view-opt {
+    padding: 4px 12px; border-radius: 4px; cursor: pointer;
+    font-size: 11px; font-weight: 600; color: var(--text-dim);
+    transition: all 0.15s;
+  }
+  .view-opt.active { background: var(--red); color: white; }
+
+  /* ── FILTER ROW ───────────────────────────────────── */
+  .filter-row { display: flex; align-items: center; gap: 10px; }
+  .filter-chip {
+    padding: 5px 12px; border-radius: 20px; cursor: pointer;
+    font-size: 11px; font-weight: 600; border: 1px solid var(--border);
+    color: var(--text-dim); transition: all 0.15s; background: transparent;
+  }
+  .filter-chip:hover { border-color: var(--muted); color: var(--text); }
+  .filter-chip.active { background: var(--red); border-color: var(--red); color: white; }
+
+  /* ── EMPTY STATE ──────────────────────────────────── */
+  .empty-hint {
+    text-align: center; padding: 40px 20px; color: var(--text-dim);
+    font-size: 13px;
+  }
+  .empty-hint svg { width: 36px; height: 36px; margin: 0 auto 10px; display: block; opacity: 0.3; }
+
+  /* ── SCROLLBAR ────────────────────────────────────── */
+  * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+  /* ── TRANSITIONS ──────────────────────────────────── */
+  .fade-in { animation: fadeIn 0.25s ease; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── MODE SWITCHER ────────────────────────────────── */
+  .mode-switcher {
+    display: flex; align-items: center; gap: 0;
+    background: var(--steel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 3px; margin: 12px;
+  }
+  .mode-btn {
+    flex: 1; padding: 6px 10px; border-radius: 4px; border: none;
+    cursor: pointer; font-family: 'Barlow', sans-serif;
+    font-size: 11px; font-weight: 600; transition: all 0.15s;
+    background: transparent; color: var(--text-dim);
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+  }
+  .mode-btn svg { width: 12px; height: 12px; }
+  .mode-btn.active-customer { background: var(--red); color: white; }
+  .mode-btn.active-admin    { background: #333; color: var(--white); border: 1px solid var(--mid); }
+  .mode-btn:not(.active-customer):not(.active-admin):hover { color: var(--text); }
+
+  /* ── MODAL OVERLAY ────────────────────────────────── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    z-index: 200; display: flex; align-items: center; justify-content: center;
+    padding: 24px; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--charcoal); border: 1px solid var(--border);
+    border-radius: 10px; width: 100%; max-width: 600px;
+    max-height: 90vh; overflow-y: auto;
+    transform: translateY(16px); transition: transform 0.2s;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.7);
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal-header {
+    padding: 20px 24px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; justify-content: space-between;
+    position: sticky; top: 0; background: var(--charcoal); z-index: 1;
+  }
+  .modal-header h2 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 22px; font-weight: 700; color: var(--white);
+  }
+  .modal-header .modal-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .modal-close {
+    width: 30px; height: 30px; border-radius: 50%; background: var(--steel);
+    border: 1px solid var(--border); cursor: pointer; color: var(--text-dim);
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
+    flex-shrink: 0; transition: all 0.15s; margin-left: 12px;
+  }
+  .modal-close:hover { background: var(--red); border-color: var(--red); color: white; }
+  .modal-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+  .modal-footer {
+    padding: 16px 24px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+    position: sticky; bottom: 0; background: var(--charcoal);
+  }
+
+  /* ── FORM ELEMENTS ────────────────────────────────── */
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-label { font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-dim); }
+  .form-label span { color: var(--red); margin-left: 2px; }
+  .form-input, .form-select, .form-textarea {
+    background: var(--steel); border: 1px solid var(--border);
+    border-radius: 5px; padding: 9px 12px;
+    color: var(--text); font-family: 'Barlow', sans-serif; font-size: 13px;
+    transition: border-color 0.15s; outline: none; width: 100%;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--red); }
+  .form-input::placeholder, .form-textarea::placeholder { color: var(--muted); }
+  .form-select option { background: var(--charcoal); }
+  .form-textarea { resize: vertical; min-height: 100px; line-height: 1.5; }
+  .form-hint { font-size: 11px; color: var(--muted); }
+  .upload-zone {
+    border: 2px dashed var(--border); border-radius: 6px; padding: 20px;
+    text-align: center; cursor: pointer; transition: all 0.15s;
+  }
+  .upload-zone:hover { border-color: var(--red); background: var(--red-dim); }
+  .upload-zone svg { width: 28px; height: 28px; color: var(--muted); margin: 0 auto 8px; display: block; }
+  .upload-zone .up-label { font-size: 12px; font-weight: 600; color: var(--text-dim); }
+  .upload-zone .up-hint  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* ── ADMIN STYLES ─────────────────────────────────── */
+  .admin-mode .sidebar { background: #161616; border-right-color: #2a2a2a; }
+  .admin-mode .sidebar-logo { border-bottom-color: #2a2a2a; }
+  .admin-mode .topbar { background: #161616; border-bottom-color: #2a2a2a; }
+  .admin-mode .content { background: #111; }
+  .admin-banner {
+    background: linear-gradient(90deg, #1a0a0a, #2a0808);
+    border-bottom: 2px solid var(--red);
+    padding: 6px 24px; display: flex; align-items: center; gap: 10px;
+    font-size: 11px; font-weight: 600; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--red); flex-shrink: 0;
+  }
+  .admin-banner svg { width: 14px; height: 14px; }
+  .kpi-row { display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; }
+  .admin-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .admin-grid-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+  .customer-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 18px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    cursor: pointer; transition: background 0.1s;
+  }
+  .customer-row:hover { background: rgba(255,255,255,0.02); }
+  .cust-avatar {
+    width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: white;
+  }
+  .cust-info .cust-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .cust-info .cust-meta { font-size: 11px; color: var(--text-dim); }
+  .cust-stats { margin-left: auto; display: flex; gap: 20px; text-align: right; }
+  .cust-stat-val { font-size: 14px; font-weight: 700; color: var(--white); }
+  .cust-stat-lbl { font-size: 10px; color: var(--muted); }
+  .alert-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .alert-item:last-child { border-bottom: none; }
+  .alert-icon {
+    width: 30px; height: 30px; border-radius: 6px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .alert-icon svg { width: 14px; height: 14px; }
+  .alert-icon.red   { background: rgba(200,16,46,0.15); color: var(--red); }
+  .alert-icon.amber { background: rgba(243,156,18,0.15);  color: var(--amber); }
+  .alert-icon.green { background: rgba(46,204,113,0.15);  color: var(--green); }
+  .alert-text { font-size: 12px; color: var(--text-dim); line-height: 1.5; flex: 1; }
+  .alert-text strong { color: var(--text); font-weight: 600; }
+  .alert-time { font-size: 10px; color: var(--muted); margin-top: 3px; }
+  .alert-action { font-size: 11px; color: var(--red); font-weight: 600; cursor: pointer; white-space: nowrap; padding-top: 2px; }
+  .alert-action:hover { text-decoration: underline; }
+  .progress-bar-wrap { margin-top: 6px; }
+  .progress-bar-bg { height: 6px; background: var(--steel); border-radius: 3px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; border-radius: 3px; background: var(--red); }
+  .progress-bar-fill.green { background: var(--green); }
+  .progress-bar-fill.amber { background: var(--amber); }
+  .quick-action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 14px; }
+  .quick-action {
+    background: var(--steel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px; cursor: pointer;
+    transition: all 0.15s; display: flex; align-items: center; gap: 10px;
+  }
+  .quick-action:hover { border-color: var(--red); background: var(--red-dim); }
+  .quick-action svg { width: 18px; height: 18px; color: var(--red); flex-shrink: 0; }
+  .quick-action-label { font-size: 12px; font-weight: 600; color: var(--text); }
+  .quick-action-sub   { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ═══ SIDEBAR ════════════════════════════════════════ -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">BW</div>
+      <div class="logo-text">
+        <div class="name">BuilderConnect</div>
+        <div class="sub">Builders Warehouse</div>
+      </div>
+    </div>
+
+    <!-- Mode Switcher -->
+    <div class="mode-switcher">
+      <button class="mode-btn active-customer" id="btn-customer" onclick="setMode('customer')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Customer
+      </button>
+      <button class="mode-btn" id="btn-admin" onclick="setMode('admin')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Admin
+      </button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="nav-item active" onclick="switchNav(this,'dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Work</div>
+      <div class="nav-item" onclick="switchNav(this,'jobs')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+        My Jobs
+      </div>
+      <div class="nav-item" onclick="switchNav(this,'documents')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        Documents
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Communication</div>
+      <div class="nav-item" onclick="switchNav(this,'rfis')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        RFIs
+        <span class="nav-badge">3</span>
+      </div>
+      <div class="nav-item" onclick="switchNav(this,'submittals')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Submittals
+        <span class="nav-badge">1</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Billing</div>
+      <div class="nav-item" onclick="switchNav(this,'invoices')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Invoices
+      </div>
+    </div>
+
+    <!-- Admin-only nav (hidden in customer mode) -->
+    <div id="admin-nav-section" style="display:none">
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Admin</div>
+        <div class="nav-item" onclick="switchNav(this,'admin-dashboard')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Admin Dashboard
+        </div>
+        <div class="nav-item" onclick="switchNav(this,'admin-customers')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Customers
+        </div>
+        <div class="nav-item" onclick="switchNav(this,'admin-rfis')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          All RFIs
+          <span class="nav-badge">5</span>
+        </div>
+        <div class="nav-item" onclick="switchNav(this,'admin-docs')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          Upload Documents
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="user-chip">
+        <div class="avatar">JH</div>
+        <div class="user-info">
+          <div class="user-name">James Hartwell</div>
+          <div class="user-role">General Contractor</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN ════════════════════════════════════════════ -->
+  <div class="main">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div>
+        <div class="page-title" id="page-title">Dashboard</div>
+        <div class="breadcrumb" id="breadcrumb">
+          <span>BuilderConnect</span>
+          <span class="sep">›</span>
+          <span class="current">Overview</span>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="Search jobs, documents…">
+        </div>
+        <button class="btn btn-ghost" id="back-btn" style="display:none" onclick="goBack()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg>
+          Back
+        </button>
+        <button class="btn btn-primary" id="new-rfi-btn">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New RFI
+        </button>
+      </div>
+    </div>
+    <!-- Admin banner (shown only in admin mode) -->
+    <div class="admin-banner" id="admin-banner" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      ADMIN MODE &nbsp;—&nbsp; Builders Warehouse Internal Staff View
+    </div>
+
+
+    <!-- CONTENT AREA -->
+    <div class="content" id="content-area">
+
+      <!-- ══ DASHBOARD VIEW ══════════════════════════════ -->
+      <div id="view-dashboard" class="fade-in">
+
+        <div class="stat-row">
+          <div class="stat-card">
+            <div class="stat-label">Active Jobs</div>
+            <div class="stat-value">12</div>
+            <div class="stat-sub"><span class="up">↑ 3</span> from last month</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-label">Delivered</div>
+            <div class="stat-value">47</div>
+            <div class="stat-sub">Jobs this year</div>
+          </div>
+          <div class="stat-card amber">
+            <div class="stat-label">Open RFIs</div>
+            <div class="stat-value">3</div>
+            <div class="stat-sub"><span class="warn">2 awaiting response</span></div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-label">Submittals</div>
+            <div class="stat-value">1</div>
+            <div class="stat-sub">Under review</div>
+          </div>
+        </div>
+
+        <div class="panel-row">
+
+          <!-- Recent Jobs -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Recent Jobs</div>
+              <span class="panel-link" onclick="switchNavByName('jobs')">View All →</span>
+            </div>
+            <table class="jobs-table">
+              <thead>
+                <tr>
+                  <th>Job #</th>
+                  <th>Project</th>
+                  <th>Status</th>
+                  <th>Delivery</th>
+                  <th>Docs</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr onclick="openJob('208135-001','Maplewood Estates Phase 2')">
+                  <td><span class="job-num">208135-001</span></td>
+                  <td><span class="job-name">Maplewood Estates Phase 2</span></td>
+                  <td><span class="badge badge-green">Delivered</span></td>
+                  <td>Jan 14, 2026</td>
+                  <td><div class="doc-icons">
+                    <div class="doc-icon" title="Engineering PDF">ENG</div>
+                    <div class="doc-icon" title="Layout">LAY</div>
+                    <div class="doc-icon" title="Invoice">INV</div>
+                  </div></td>
+                </tr>
+                <tr onclick="openJob('208240-003','Ridgeline Commons Building A')">
+                  <td><span class="job-num">208240-003</span></td>
+                  <td><span class="job-name">Ridgeline Commons Bldg A</span></td>
+                  <td><span class="badge badge-amber">In Production</span></td>
+                  <td>Feb 28, 2026</td>
+                  <td><div class="doc-icons">
+                    <div class="doc-icon">ENG</div>
+                    <div class="doc-icon">LAY</div>
+                  </div></td>
+                </tr>
+                <tr onclick="openJob('208301-002','Sunridge Custom Residence')">
+                  <td><span class="job-num">208301-002</span></td>
+                  <td><span class="job-name">Sunridge Custom Residence</span></td>
+                  <td><span class="badge badge-blue">Scheduled</span></td>
+                  <td>Mar 15, 2026</td>
+                  <td><div class="doc-icons">
+                    <div class="doc-icon">LAY</div>
+                  </div></td>
+                </tr>
+                <tr onclick="openJob('208099-001','Knox County Community Center')">
+                  <td><span class="job-num">208099-001</span></td>
+                  <td><span class="job-name">Knox County Community Ctr</span></td>
+                  <td><span class="badge badge-green">Delivered</span></td>
+                  <td>Dec 20, 2025</td>
+                  <td><div class="doc-icons">
+                    <div class="doc-icon">ENG</div>
+                    <div class="doc-icon">LAY</div>
+                    <div class="doc-icon">INV</div>
+                  </div></td>
+                </tr>
+                <tr onclick="openJob('207988-002','Blue Ridge Apartments Unit 3')">
+                  <td><span class="job-num">207988-002</span></td>
+                  <td><span class="job-name">Blue Ridge Apts Unit 3</span></td>
+                  <td><span class="badge badge-red">On Hold</span></td>
+                  <td>TBD</td>
+                  <td><div class="doc-icons">
+                    <div class="doc-icon">LAY</div>
+                  </div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Activity Feed -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Recent Activity</div>
+            </div>
+            <div class="activity-list">
+              <div class="activity-item">
+                <div class="activity-dot dot-green"></div>
+                <div>
+                  <div class="activity-text"><strong>208135-001</strong> — Engineering PDF updated with sealed stamp</div>
+                  <div class="activity-time">2 hours ago</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-dot dot-red"></div>
+                <div>
+                  <div class="activity-text">RFI-004 response received from <strong>Builders Warehouse</strong></div>
+                  <div class="activity-time">Yesterday, 3:42 PM</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-dot dot-amber"></div>
+                <div>
+                  <div class="activity-text"><strong>SUB-002</strong> returned with comments — revision needed</div>
+                  <div class="activity-time">Yesterday, 9:15 AM</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-dot dot-blue"></div>
+                <div>
+                  <div class="activity-text"><strong>208301-002</strong> added to your account and ready to view</div>
+                  <div class="activity-time">Jan 28, 2026</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-dot dot-green"></div>
+                <div>
+                  <div class="activity-text">Invoice <strong>INV-20245</strong> available — $18,440.00</div>
+                  <div class="activity-time">Jan 22, 2026</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-dot dot-red"></div>
+                <div>
+                  <div class="activity-text">RFI-003 submitted for <strong>208240-003</strong> — awaiting response</div>
+                  <div class="activity-time">Jan 20, 2026</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ══ JOBS VIEW ══════════════════════════════════ -->
+      <div id="view-jobs" style="display:none" class="fade-in">
+        <div id="jobs-list-view" class="jobs-view">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="filter-row">
+              <button class="filter-chip active">All Jobs</button>
+              <button class="filter-chip">In Production</button>
+              <button class="filter-chip">Delivered</button>
+              <button class="filter-chip">Scheduled</button>
+            </div>
+            <div style="margin-left:auto;">
+              <div class="view-pill">
+                <div class="view-opt active">List</div>
+                <div class="view-opt">Cards</div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <table class="jobs-table">
+              <thead><tr>
+                <th>Job Number</th><th>Project Name</th><th>Status</th>
+                <th>Order Date</th><th>Delivery Date</th><th>Documents</th>
+              </tr></thead>
+              <tbody>
+                <tr onclick="openJob('208135-001','Maplewood Estates Phase 2')">
+                  <td><span class="job-num">208135-001</span></td><td><span class="job-name">Maplewood Estates Phase 2</span></td>
+                  <td><span class="badge badge-green">Delivered</span></td>
+                  <td>Dec 10, 2025</td><td>Jan 14, 2026</td>
+                  <td><div class="doc-icons"><div class="doc-icon">ENG</div><div class="doc-icon">LAY</div><div class="doc-icon">INV</div></div></td>
+                </tr>
+                <tr onclick="openJob('208240-003','Ridgeline Commons Building A')">
+                  <td><span class="job-num">208240-003</span></td><td><span class="job-name">Ridgeline Commons Building A</span></td>
+                  <td><span class="badge badge-amber">In Production</span></td>
+                  <td>Jan 5, 2026</td><td>Feb 28, 2026</td>
+                  <td><div class="doc-icons"><div class="doc-icon">ENG</div><div class="doc-icon">LAY</div></div></td>
+                </tr>
+                <tr onclick="openJob('208301-002','Sunridge Custom Residence')">
+                  <td><span class="job-num">208301-002</span></td><td><span class="job-name">Sunridge Custom Residence</span></td>
+                  <td><span class="badge badge-blue">Scheduled</span></td>
+                  <td>Jan 28, 2026</td><td>Mar 15, 2026</td>
+                  <td><div class="doc-icons"><div class="doc-icon">LAY</div></div></td>
+                </tr>
+                <tr onclick="openJob('208099-001','Knox County Community Center')">
+                  <td><span class="job-num">208099-001</span></td><td><span class="job-name">Knox County Community Center</span></td>
+                  <td><span class="badge badge-green">Delivered</span></td>
+                  <td>Nov 1, 2025</td><td>Dec 20, 2025</td>
+                  <td><div class="doc-icons"><div class="doc-icon">ENG</div><div class="doc-icon">LAY</div><div class="doc-icon">INV</div></div></td>
+                </tr>
+                <tr onclick="openJob('207988-002','Blue Ridge Apartments Unit 3')">
+                  <td><span class="job-num">207988-002</span></td><td><span class="job-name">Blue Ridge Apartments Unit 3</span></td>
+                  <td><span class="badge badge-red">On Hold</span></td>
+                  <td>Oct 15, 2025</td><td>TBD</td>
+                  <td><div class="doc-icons"><div class="doc-icon">LAY</div></div></td>
+                </tr>
+                <tr onclick="openJob('207750-001','Valley View Townhomes Phase 1')">
+                  <td><span class="job-num">207750-001</span></td><td><span class="job-name">Valley View Townhomes Phase 1</span></td>
+                  <td><span class="badge badge-green">Delivered</span></td>
+                  <td>Sep 3, 2025</td><td>Oct 30, 2025</td>
+                  <td><div class="doc-icons"><div class="doc-icon">ENG</div><div class="doc-icon">LAY</div><div class="doc-icon">INV</div></div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- JOB DETAIL -->
+        <div id="job-detail-view" class="detail-view">
+          <div class="job-hero">
+            <div class="job-hero-left">
+              <h1 id="detail-job-num">208135-001</h1>
+              <div class="job-client" id="detail-job-name">Maplewood Estates Phase 2</div>
+              <div class="job-meta-chips">
+                <div class="meta-chip"><strong>Status:</strong>&nbsp;<span style="color:#2ECC71">Delivered</span></div>
+                <div class="meta-chip"><strong>Delivered:</strong>&nbsp;Jan 14, 2026</div>
+                <div class="meta-chip"><strong>Trusses:</strong>&nbsp;84 pieces</div>
+                <div class="meta-chip"><strong>Batches:</strong>&nbsp;3</div>
+              </div>
+            </div>
+            <div class="job-hero-actions">
+              <button class="btn btn-ghost">Download All</button>
+              <button class="btn btn-primary">New RFI</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="tabs" id="job-tabs">
+              <div class="tab active" onclick="switchTab(this,'trusses')">Trusses</div>
+              <div class="tab" onclick="switchTab(this,'docs')">Documents</div>
+              <div class="tab" onclick="switchTab(this,'rfis-job')">RFIs</div>
+              <div class="tab" onclick="switchTab(this,'subs-job')">Submittals</div>
+            </div>
+
+            <!-- Trusses Tab -->
+            <div id="tab-trusses" class="tab-content active">
+              <div class="truss-grid">
+                <div class="truss-card"><div class="truss-code">A01</div><div class="truss-type">Common Truss</div><div class="truss-qty">Qty: 12 &nbsp;|&nbsp; 2-Ply</div></div>
+                <div class="truss-card"><div class="truss-code">B04</div><div class="truss-type">Hip Girder</div><div class="truss-qty">Qty: 4 &nbsp;|&nbsp; 1-Ply</div></div>
+                <div class="truss-card"><div class="truss-code">C02</div><div class="truss-type">Valley Jack</div><div class="truss-qty">Qty: 8 &nbsp;|&nbsp; 1-Ply</div></div>
+                <div class="truss-card"><div class="truss-code">D01</div><div class="truss-type">Common Truss</div><div class="truss-qty">Qty: 20 &nbsp;|&nbsp; 1-Ply</div></div>
+                <div class="truss-card"><div class="truss-code">E03</div><div class="truss-type">End Jack</div><div class="truss-qty">Qty: 6 &nbsp;|&nbsp; 1-Ply</div></div>
+                <div class="truss-card"><div class="truss-code">F02</div><div class="truss-type">Scissor</div><div class="truss-qty">Qty: 10 &nbsp;|&nbsp; 2-Ply</div></div>
+                <div class="truss-card"><div class="truss-code">G01</div><div class="truss-type">Mono Slope</div><div class="truss-qty">Qty: 8 &nbsp;|&nbsp; 1-Ply</div></div>
+                <div class="truss-card"><div class="truss-code">H05</div><div class="truss-type">Hip Set</div><div class="truss-qty">Qty: 4 &nbsp;|&nbsp; 3-Ply</div></div>
+                <div class="truss-card" style="border:1px dashed var(--border);background:transparent;display:flex;align-items:center;justify-content:center;">
+                  <div style="text-align:center;color:var(--muted);font-size:11px;">+ 12 more<br>trusses</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Documents Tab -->
+            <div id="tab-docs" class="tab-content">
+              <div class="doc-list">
+                <div class="doc-row">
+                  <div class="doc-file-icon icon-eng">ENG</div>
+                  <div class="doc-info">
+                    <div class="doc-name">208135-001 — Sealed Engineering Drawings.pdf</div>
+                    <div class="doc-meta">Sealed Jan 10, 2026 &nbsp;·&nbsp; 4.2 MB &nbsp;·&nbsp; 28 pages</div>
+                  </div>
+                  <div class="doc-dl-btn">Download</div>
+                </div>
+                <div class="doc-row">
+                  <div class="doc-file-icon icon-pdf">LAY</div>
+                  <div class="doc-info">
+                    <div class="doc-name">208135-001 — Truss Layout Plan.pdf</div>
+                    <div class="doc-meta">Generated Dec 12, 2025 &nbsp;·&nbsp; 1.8 MB &nbsp;·&nbsp; 3 pages</div>
+                  </div>
+                  <div class="doc-dl-btn">Download</div>
+                </div>
+                <div class="doc-row">
+                  <div class="doc-file-icon icon-dwg">DWG</div>
+                  <div class="doc-info">
+                    <div class="doc-name">208135-001 — Placement Diagram.pdf</div>
+                    <div class="doc-meta">Generated Dec 12, 2025 &nbsp;·&nbsp; 2.1 MB &nbsp;·&nbsp; 2 pages</div>
+                  </div>
+                  <div class="doc-dl-btn">Download</div>
+                </div>
+                <div class="doc-row">
+                  <div class="doc-file-icon icon-pdf">INV</div>
+                  <div class="doc-info">
+                    <div class="doc-name">Invoice INV-20245 — $18,440.00.pdf</div>
+                    <div class="doc-meta">Issued Jan 15, 2026 &nbsp;·&nbsp; Balance: $0.00 (Paid)</div>
+                  </div>
+                  <div class="doc-dl-btn">Download</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- RFIs Job Tab -->
+            <div id="tab-rfis-job" class="tab-content">
+              <div class="rfi-full-list">
+                <div class="rfi-full-item">
+                  <div class="rfi-full-header">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                      <span class="rfi-id">RFI-004</span>
+                      <span style="font-size:12px;font-weight:600;color:var(--text)">Bearing wall clearance on east gable</span>
+                    </div>
+                    <span class="badge badge-green">Answered</span>
+                  </div>
+                  <div class="rfi-thread">
+                    <div class="rfi-msg">
+                      <div class="rfi-msg-avatar avatar-cust">JH</div>
+                      <div class="rfi-bubble">
+                        <div class="sender">James Hartwell &nbsp;·&nbsp; General Contractor</div>
+                        <div class="message">The bearing wall on the east gable appears to conflict with our HVAC rough-in. Can you confirm the minimum clearance at the bottom chord on trusses A01 through A04?</div>
+                        <div class="ts">Jan 18, 2026 at 9:14 AM</div>
+                      </div>
+                    </div>
+                    <div class="rfi-msg">
+                      <div class="rfi-msg-avatar avatar-bw">BW</div>
+                      <div class="rfi-bubble">
+                        <div class="sender">Sarah Mitchell &nbsp;·&nbsp; Builders Warehouse Engineering</div>
+                        <div class="message">Hi James — confirmed. Trusses A01–A04 have a 14" bottom chord clearance per the sealed drawings (see page 6, detail 3A). You have 12" of usable space after the chase. No modification needed. Let us know if you need a revised detail.</div>
+                        <div class="ts">Jan 19, 2026 at 2:38 PM</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Submittals Job Tab -->
+            <div id="tab-subs-job" class="tab-content">
+              <div class="submittal-list">
+                <div class="submittal-row">
+                  <div class="sub-num">SUB-001</div>
+                  <div class="sub-info">
+                    <div class="sub-title">Roof Truss Structural Submittal — Package A</div>
+                    <div class="sub-meta">Submitted Nov 15, 2025 &nbsp;·&nbsp; Rev 1</div>
+                  </div>
+                  <div class="sub-status"><span class="badge badge-green">Approved</span></div>
+                </div>
+              </div>
+              <div class="empty-hint" style="padding:20px">
+                <div style="font-size:12px;color:var(--muted)">All submittals for this job are resolved.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ DOCUMENTS VIEW ════════════════════════════ -->
+      <div id="view-documents" style="display:none" class="fade-in">
+        <div style="display:flex;gap:10px;margin-bottom:4px;">
+          <button class="filter-chip active">All</button>
+          <button class="filter-chip">Engineering</button>
+          <button class="filter-chip">Layouts</button>
+          <button class="filter-chip">Invoices</button>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">All Documents</div>
+            <span style="font-size:11px;color:var(--muted)">18 files across 6 jobs</span>
+          </div>
+          <div class="doc-list">
+            <div class="doc-row"><div class="doc-file-icon icon-eng">ENG</div><div class="doc-info"><div class="doc-name">208135-001 — Sealed Engineering Drawings.pdf</div><div class="doc-meta">Job 208135-001 &nbsp;·&nbsp; Sealed Jan 10, 2026 &nbsp;·&nbsp; 4.2 MB</div></div><div class="doc-dl-btn">Download</div></div>
+            <div class="doc-row"><div class="doc-file-icon icon-pdf">LAY</div><div class="doc-info"><div class="doc-name">208135-001 — Truss Layout Plan.pdf</div><div class="doc-meta">Job 208135-001 &nbsp;·&nbsp; Dec 12, 2025 &nbsp;·&nbsp; 1.8 MB</div></div><div class="doc-dl-btn">Download</div></div>
+            <div class="doc-row"><div class="doc-file-icon icon-eng">ENG</div><div class="doc-info"><div class="doc-name">208240-003 — Sealed Engineering Drawings.pdf</div><div class="doc-meta">Job 208240-003 &nbsp;·&nbsp; Jan 8, 2026 &nbsp;·&nbsp; 3.9 MB</div></div><div class="doc-dl-btn">Download</div></div>
+            <div class="doc-row"><div class="doc-file-icon icon-pdf">LAY</div><div class="doc-info"><div class="doc-name">208240-003 — Truss Layout Plan.pdf</div><div class="doc-meta">Job 208240-003 &nbsp;·&nbsp; Jan 6, 2026 &nbsp;·&nbsp; 2.2 MB</div></div><div class="doc-dl-btn">Download</div></div>
+            <div class="doc-row"><div class="doc-file-icon icon-pdf">LAY</div><div class="doc-info"><div class="doc-name">208301-002 — Preliminary Layout.pdf</div><div class="doc-meta">Job 208301-002 &nbsp;·&nbsp; Jan 29, 2026 &nbsp;·&nbsp; 1.1 MB</div></div><div class="doc-dl-btn">Download</div></div>
+            <div class="doc-row"><div class="doc-file-icon icon-pdf">INV</div><div class="doc-info"><div class="doc-name">Invoice INV-20245 — $18,440.00</div><div class="doc-meta">Job 208135-001 &nbsp;·&nbsp; Issued Jan 15, 2026 &nbsp;·&nbsp; Paid</div></div><div class="doc-dl-btn">Download</div></div>
+            <div class="doc-row"><div class="doc-file-icon icon-pdf">INV</div><div class="doc-info"><div class="doc-name">Invoice INV-20118 — $24,200.00</div><div class="doc-meta">Job 208099-001 &nbsp;·&nbsp; Issued Dec 22, 2025 &nbsp;·&nbsp; Paid</div></div><div class="doc-dl-btn">Download</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ RFIS VIEW ═════════════════════════════════ -->
+      <div id="view-rfis" style="display:none" class="fade-in">
+        <div style="display:flex;gap:10px;margin-bottom:4px;align-items:center;">
+          <button class="filter-chip active">All</button>
+          <button class="filter-chip">Open</button>
+          <button class="filter-chip">Awaiting Response</button>
+          <button class="filter-chip">Answered</button>
+          <button class="btn btn-primary" style="margin-left:auto">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Submit New RFI
+          </button>
+        </div>
+        <div class="panel">
+          <div class="rfi-full-list">
+
+            <div class="rfi-full-item">
+              <div class="rfi-full-header">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                  <span class="rfi-id">RFI-006</span>
+                  <span style="font-size:12px;font-weight:600;color:var(--text)">Ridge board height — 208240-003</span>
+                  <span style="font-size:10px;color:var(--muted)">Job 208240-003</span>
+                </div>
+                <span class="badge badge-amber">Awaiting Response</span>
+              </div>
+              <div class="rfi-thread">
+                <div class="rfi-msg">
+                  <div class="rfi-msg-avatar avatar-cust">JH</div>
+                  <div class="rfi-bubble">
+                    <div class="sender">James Hartwell &nbsp;·&nbsp; General Contractor</div>
+                    <div class="message">The ridge board height shown on the layout doesn't match our architect's ceiling height spec at 9'-6". Please confirm or provide a revised truss profile for the great room section (trusses D01–D06).</div>
+                    <div class="ts">Jan 30, 2026 at 11:02 AM</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="rfi-full-item">
+              <div class="rfi-full-header">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                  <span class="rfi-id">RFI-005</span>
+                  <span style="font-size:12px;font-weight:600;color:var(--text)">Heel height clarification — 208240-003</span>
+                  <span style="font-size:10px;color:var(--muted)">Job 208240-003</span>
+                </div>
+                <span class="badge badge-amber">Awaiting Response</span>
+              </div>
+              <div class="rfi-thread">
+                <div class="rfi-msg">
+                  <div class="rfi-msg-avatar avatar-cust">JH</div>
+                  <div class="rfi-bubble">
+                    <div class="sender">James Hartwell &nbsp;·&nbsp; General Contractor</div>
+                    <div class="message">Can you confirm heel height on the perimeter trusses? Our energy spec requires R-38 at the eave and I need to verify we have adequate space.</div>
+                    <div class="ts">Jan 25, 2026 at 8:45 AM</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="rfi-full-item">
+              <div class="rfi-full-header">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                  <span class="rfi-id">RFI-004</span>
+                  <span style="font-size:12px;font-weight:600;color:var(--text)">Bearing wall clearance — 208135-001</span>
+                  <span style="font-size:10px;color:var(--muted)">Job 208135-001</span>
+                </div>
+                <span class="badge badge-green">Answered</span>
+              </div>
+              <div class="rfi-thread">
+                <div class="rfi-msg">
+                  <div class="rfi-msg-avatar avatar-cust">JH</div>
+                  <div class="rfi-bubble">
+                    <div class="sender">James Hartwell</div>
+                    <div class="message">The bearing wall on the east gable appears to conflict with our HVAC rough-in. Can you confirm the minimum clearance at the bottom chord on trusses A01 through A04?</div>
+                    <div class="ts">Jan 18, 2026</div>
+                  </div>
+                </div>
+                <div class="rfi-msg">
+                  <div class="rfi-msg-avatar avatar-bw">BW</div>
+                  <div class="rfi-bubble">
+                    <div class="sender">Sarah Mitchell &nbsp;·&nbsp; Builders Warehouse Engineering</div>
+                    <div class="message">Confirmed — trusses A01–A04 have a 14" bottom chord clearance per sealed drawings (page 6, detail 3A). You have 12" usable after the chase. No modification needed.</div>
+                    <div class="ts">Jan 19, 2026</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ SUBMITTALS VIEW ═══════════════════════════ -->
+      <div id="view-submittals" style="display:none" class="fade-in">
+        <div style="display:flex;gap:10px;margin-bottom:4px;align-items:center;">
+          <button class="filter-chip active">All</button>
+          <button class="filter-chip">Pending</button>
+          <button class="filter-chip">Under Review</button>
+          <button class="filter-chip">Returned</button>
+          <button class="filter-chip">Approved</button>
+          <button class="btn btn-primary" style="margin-left:auto">Upload Submittal</button>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">Submittal Register</div></div>
+          <div class="submittal-list">
+            <div class="submittal-row">
+              <div class="sub-num">SUB-002</div>
+              <div class="sub-info">
+                <div class="sub-title">Roof Truss Structural Submittal — Ridgeline Commons Bldg A</div>
+                <div class="sub-meta">Submitted Jan 20, 2026 &nbsp;·&nbsp; Rev 2 &nbsp;·&nbsp; Job 208240-003</div>
+              </div>
+              <div class="sub-status"><span class="badge badge-amber">Returned w/ Comments</span></div>
+            </div>
+            <div class="submittal-row">
+              <div class="sub-num">SUB-001</div>
+              <div class="sub-info">
+                <div class="sub-title">Roof Truss Structural Submittal — Maplewood Estates Ph 2</div>
+                <div class="sub-meta">Submitted Nov 15, 2025 &nbsp;·&nbsp; Rev 1 &nbsp;·&nbsp; Job 208135-001</div>
+              </div>
+              <div class="sub-status"><span class="badge badge-green">Approved</span></div>
+            </div>
+            <div class="submittal-row">
+              <div class="sub-num">SUB-003</div>
+              <div class="sub-info">
+                <div class="sub-title">Floor Truss Submittal — Sunridge Custom Residence</div>
+                <div class="sub-meta">Submitted Feb 1, 2026 &nbsp;·&nbsp; Rev 1 &nbsp;·&nbsp; Job 208301-002</div>
+              </div>
+              <div class="sub-status"><span class="badge badge-blue">Under Review</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ INVOICES VIEW ═════════════════════════════ -->
+      <div id="view-invoices" style="display:none" class="fade-in">
+        <div class="stat-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:4px;">
+          <div class="stat-card blue"><div class="stat-label">Total Invoiced YTD</div><div class="stat-value">$84,200</div><div class="stat-sub">Across 6 jobs</div></div>
+          <div class="stat-card green"><div class="stat-label">Paid</div><div class="stat-value">$61,840</div><div class="stat-sub">4 invoices</div></div>
+          <div class="stat-card amber"><div class="stat-label">Outstanding</div><div class="stat-value">$22,360</div><div class="stat-sub"><span class="warn">2 invoices open</span></div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">Invoice History</div></div>
+          <table class="jobs-table">
+            <thead><tr><th>Invoice #</th><th>Job</th><th>Amount</th><th>Balance</th><th>Due Date</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><span class="job-num">INV-20312</span></td><td>208240-003</td><td>$14,600.00</td><td>$14,600.00</td><td>Mar 14, 2026</td><td><span class="badge badge-amber">Open</span></td><td><div class="doc-dl-btn" style="display:inline-flex">Download</div></td></tr>
+              <tr><td><span class="job-num">INV-20289</span></td><td>208301-002</td><td>$7,760.00</td><td>$7,760.00</td><td>Feb 28, 2026</td><td><span class="badge badge-amber">Open</span></td><td><div class="doc-dl-btn" style="display:inline-flex">Download</div></td></tr>
+              <tr><td><span class="job-num">INV-20245</span></td><td>208135-001</td><td>$18,440.00</td><td>$0.00</td><td>Feb 14, 2026</td><td><span class="badge badge-green">Paid</span></td><td><div class="doc-dl-btn" style="display:inline-flex">Download</div></td></tr>
+              <tr><td><span class="job-num">INV-20118</span></td><td>208099-001</td><td>$24,200.00</td><td>$0.00</td><td>Jan 20, 2026</td><td><span class="badge badge-green">Paid</span></td><td><div class="doc-dl-btn" style="display:inline-flex">Download</div></td></tr>
+              <tr><td><span class="job-num">INV-19940</span></td><td>207988-002</td><td>$11,400.00</td><td>$0.00</td><td>Dec 1, 2025</td><td><span class="badge badge-green">Paid</span></td><td><div class="doc-dl-btn" style="display:inline-flex">Download</div></td></tr>
+              <tr><td><span class="job-num">INV-19801</span></td><td>207750-001</td><td>$7,800.00</td><td>$0.00</td><td>Nov 14, 2025</td><td><span class="badge badge-green">Paid</span></td><td><div class="doc-dl-btn" style="display:inline-flex">Download</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+
+
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     ADMIN DASHBOARD VIEW  (injected into main content via JS)
+════════════════════════════════════════════════════════════ -->
+<div id="view-admin-dashboard" style="display:none" class="fade-in">
+
+  <div class="kpi-row">
+    <div class="stat-card"><div class="stat-label">Active Jobs</div><div class="stat-value">47</div><div class="stat-sub">Across 23 customers</div></div>
+    <div class="stat-card amber"><div class="stat-label">Open RFIs</div><div class="stat-value">5</div><div class="stat-sub"><span class="warn">3 awaiting response</span></div></div>
+    <div class="stat-card amber"><div class="stat-label">Submittals</div><div class="stat-value">4</div><div class="stat-sub"><span class="warn">2 need action</span></div></div>
+    <div class="stat-card green"><div class="stat-label">Delivered MTD</div><div class="stat-value">18</div><div class="stat-sub"><span class="up">↑ 4</span> vs last month</div></div>
+    <div class="stat-card blue"><div class="stat-label">Outstanding A/R</div><div class="stat-value">$22K</div><div class="stat-sub">2 open invoices</div></div>
+  </div>
+
+  <div class="admin-grid-3">
+
+    <!-- Action Items -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Action Required</div>
+        <span style="font-size:11px;color:var(--red);font-weight:600">5 items</span>
+      </div>
+      <div>
+        <div class="alert-item">
+          <div class="alert-icon red">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <div class="alert-text">
+            <strong>RFI-006</strong> — Ridge board height on 208240-003 submitted by James Hartwell. Awaiting engineering response.
+            <div class="alert-time">Submitted 1 day ago — Urgent</div>
+          </div>
+          <div class="alert-action">Respond</div>
+        </div>
+        <div class="alert-item">
+          <div class="alert-icon red">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <div class="alert-text">
+            <strong>RFI-005</strong> — Heel height clarification on 208240-003. Awaiting response.
+            <div class="alert-time">Submitted 6 days ago</div>
+          </div>
+          <div class="alert-action">Respond</div>
+        </div>
+        <div class="alert-item">
+          <div class="alert-icon amber">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
+          <div class="alert-text">
+            <strong>SUB-002</strong> — Ridgeline Commons submittal Rev 2 returned with comments. Customer needs to resubmit.
+            <div class="alert-time">Returned yesterday</div>
+          </div>
+          <div class="alert-action">View</div>
+        </div>
+        <div class="alert-item">
+          <div class="alert-icon amber">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
+          <div class="alert-text">
+            <strong>SUB-003</strong> — Sunridge submittal under review. Assigned to engineering team.
+            <div class="alert-time">Received Feb 1, 2026</div>
+          </div>
+          <div class="alert-action">Review</div>
+        </div>
+        <div class="alert-item">
+          <div class="alert-icon green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+          </div>
+          <div class="alert-text">
+            <strong>208301-002</strong> engineering drawings ready for upload. Sealed stamp received from engineer.
+            <div class="alert-time">Ready to publish to customer</div>
+          </div>
+          <div class="alert-action">Upload</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">Quick Actions</div></div>
+        <div class="quick-action-grid">
+          <div class="quick-action">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div><div class="quick-action-label">Upload Documents</div><div class="quick-action-sub">Push PDFs to customer</div></div>
+          </div>
+          <div class="quick-action">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+            <div><div class="quick-action-label">Add Customer</div><div class="quick-action-sub">New account setup</div></div>
+          </div>
+          <div class="quick-action">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <div><div class="quick-action-label">Generate QR Labels</div><div class="quick-action-sub">Print truss stickers</div></div>
+          </div>
+          <div class="quick-action">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            <div><div class="quick-action-label">Post Invoice</div><div class="quick-action-sub">Publish to customer</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">Production Status</div></div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:12px;">
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:11px;color:var(--text-dim)">Jobs In Production</span>
+              <span style="font-size:11px;font-weight:600;color:var(--text)">8 / 12</span>
+            </div>
+            <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:66%"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:11px;color:var(--text-dim)">Delivered This Month</span>
+              <span style="font-size:11px;font-weight:600;color:var(--text)">18 / 22 target</span>
+            </div>
+            <div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:82%"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:11px;color:var(--text-dim)">RFI Response Rate (&lt;24hr)</span>
+              <span style="font-size:11px;font-weight:600;color:var(--amber)">60%</span>
+            </div>
+            <div class="progress-bar-bg"><div class="progress-bar-fill amber" style="width:60%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Customer List -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">Active Customers</div>
+      <span class="panel-link">Manage All →</span>
+    </div>
+    <div>
+      <div class="customer-row">
+        <div class="cust-avatar" style="background:linear-gradient(135deg,#8B0000,#C8102E)">JH</div>
+        <div class="cust-info"><div class="cust-name">Hartwell Construction LLC</div><div class="cust-meta">James Hartwell &nbsp;·&nbsp; Account #HC-0042</div></div>
+        <div class="cust-stats">
+          <div><div class="cust-stat-val">3</div><div class="cust-stat-lbl">Active Jobs</div></div>
+          <div><div class="cust-stat-val" style="color:var(--amber)">2</div><div class="cust-stat-lbl">Open RFIs</div></div>
+          <div><div class="cust-stat-val">$14.6K</div><div class="cust-stat-lbl">Outstanding</div></div>
+          <span class="badge badge-green" style="align-self:center">Active</span>
+        </div>
+      </div>
+      <div class="customer-row">
+        <div class="cust-avatar" style="background:linear-gradient(135deg,#1a3a5c,#2e6da4)">BR</div>
+        <div class="cust-info"><div class="cust-name">Blue Ridge Builders Inc.</div><div class="cust-meta">Mike Sorenson &nbsp;·&nbsp; Account #BR-0018</div></div>
+        <div class="cust-stats">
+          <div><div class="cust-stat-val">1</div><div class="cust-stat-lbl">Active Jobs</div></div>
+          <div><div class="cust-stat-val">0</div><div class="cust-stat-lbl">Open RFIs</div></div>
+          <div><div class="cust-stat-val">$0</div><div class="cust-stat-lbl">Outstanding</div></div>
+          <span class="badge badge-green" style="align-self:center">Active</span>
+        </div>
+      </div>
+      <div class="customer-row">
+        <div class="cust-avatar" style="background:linear-gradient(135deg,#2d5a27,#4a9e3f)">KV</div>
+        <div class="cust-info"><div class="cust-name">Knox Valley Contracting</div><div class="cust-meta">Dana Pruitt &nbsp;·&nbsp; Account #KV-0055</div></div>
+        <div class="cust-stats">
+          <div><div class="cust-stat-val">2</div><div class="cust-stat-lbl">Active Jobs</div></div>
+          <div><div class="cust-stat-val">1</div><div class="cust-stat-lbl">Open RFIs</div></div>
+          <div><div class="cust-stat-val">$7.7K</div><div class="cust-stat-lbl">Outstanding</div></div>
+          <span class="badge badge-green" style="align-self:center">Active</span>
+        </div>
+      </div>
+      <div class="customer-row">
+        <div class="cust-avatar" style="background:linear-gradient(135deg,#5a3a1a,#a0642a)">SH</div>
+        <div class="cust-info"><div class="cust-name">Summit Home Builders</div><div class="cust-meta">Rachel Torres &nbsp;·&nbsp; Account #SH-0071</div></div>
+        <div class="cust-stats">
+          <div><div class="cust-stat-val">0</div><div class="cust-stat-lbl">Active Jobs</div></div>
+          <div><div class="cust-stat-val">0</div><div class="cust-stat-lbl">Open RFIs</div></div>
+          <div><div class="cust-stat-val">$0</div><div class="cust-stat-lbl">Outstanding</div></div>
+          <span class="badge badge-gray" style="align-self:center">Inactive</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     RFI SUBMISSION MODAL
+════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="rfi-modal" onclick="closeRFIModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h2>Submit a New RFI</h2>
+        <div class="modal-sub">Request for Information — your question will be logged and responded to by our team</div>
+      </div>
+      <div class="modal-close" onclick="closeModal('rfi-modal')">&#x2715;</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Job Number <span>*</span></label>
+          <select class="form-select">
+            <option value="">Select a job…</option>
+            <option selected>208240-003 — Ridgeline Commons Bldg A</option>
+            <option>208301-002 — Sunridge Custom Residence</option>
+            <option>208135-001 — Maplewood Estates Phase 2</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Related Truss / Area <span></span></label>
+          <select class="form-select">
+            <option value="">Select truss (optional)…</option>
+            <option>D01 — Common Truss</option>
+            <option>D02 — Common Truss</option>
+            <option>E03 — End Jack</option>
+            <option>F01 — Scissor</option>
+            <option>General / Whole Job</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Priority <span>*</span></label>
+        <div style="display:flex;gap:8px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-dim)">
+            <input type="radio" name="priority" value="normal" checked style="accent-color:var(--red)"> Normal
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--amber)">
+            <input type="radio" name="priority" value="urgent" style="accent-color:var(--amber)"> Urgent — Job Schedule Impacted
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">RFI Subject <span>*</span></label>
+        <input class="form-input" type="text" placeholder="Brief description of your question…" value="Ridge board height — great room section">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Question / Description <span>*</span></label>
+        <textarea class="form-textarea" placeholder="Describe your question in detail. Include any relevant measurements, spec references, or context that will help our engineering team respond accurately…">The ridge board height shown on the layout does not match our architect's ceiling height spec at 9'-6". Please confirm or provide a revised truss profile for the great room section (trusses D01–D06).</textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Attachments <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+        <div class="upload-zone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div class="up-label">Drop files here or click to browse</div>
+          <div class="up-hint">PDF, DWG, JPG — max 25 MB per file</div>
+        </div>
+      </div>
+
+      <div style="background:var(--red-dim);border:1px solid rgba(200,16,46,0.2);border-radius:6px;padding:12px 14px;">
+        <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:4px;">What happens next?</div>
+        <div style="font-size:12px;color:var(--text-dim);line-height:1.5;">Your RFI will be assigned to our engineering team. You will receive a notification when a response is posted — typically within one business day. The full thread will be saved permanently to your job record.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('rfi-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitRFI()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+        Submit RFI
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     ADMIN DASHBOARD VIEW  (injected into main content via JS)
+════════════════════════════════════════════════════════════ -->
+<div id="view-admin-dashboard" style="display:none" class="fade-in">
+
+  <div class="kpi-row">
+    <div class="stat-card"><div class="stat-label">Active Jobs</div><div class="stat-value">47</div><div class="stat-sub">Across 23 customers</div></div>
+    <div class="stat-card amber"><div class="stat-label">Open RFIs</div><div class="stat-value">5</div><div class="stat-sub"><span class="warn">3 awaiting response</span></div></div>
+    <div class="stat-card amber"><div class="stat-label">Submittals</div><div class="stat-value">4</div><div class="stat-sub"><span class="warn">2 need action</span></div></div>
+    <div class="stat-card green"><div class="stat-label">Delivered MTD</div><div class="stat-value">18</div><div class="stat-sub"><span class="up">↑ 4</span> vs last month</div></div>
+    <div class="stat-card blue"><div class="stat-label">Outstanding A/R</div><div class="stat-value">$22K</div><div class="stat-sub">2 open invoices</div></div>
+  </div>
+
+  <div class="admin-grid-3">
+
+    <!-- Action Items -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Action Required</div>
+        <span style="font-size:11px;color:var(--red);font-weight:600">5 items</span>
+      </div>
+      <div>
+        <div class="alert-item">
+          <div class="alert-icon red">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <div class="alert-text">
+            <strong>RFI-006</strong> — Ridge board height on 208240-003 submitted by James Hartwell. Awaiting engineering response.
+            <div class="alert-time">Submitted 1 day ago — Urgent</div>
+          </div>
+          <div class="alert-action">Respond</div>
+        </div>
+        <div class="alert-item">
+          <div class="alert-icon red">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <div class="alert-text">
+            <strong>RFI-005</strong> — Heel height clarification on 208240-003. Awaiting response.
+            <div class="alert-time">Submitted 6 days ago</div>
+          </div>
+          <div class="alert-action">Respond</div>
+        </div>
+        <div class="alert-item">
+          <div class="alert-icon amber">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
+          <div class="alert-text">
+            <strong>SUB-002</strong> — Ridgeline Commons submittal Rev 2 returned with comments. Customer needs to resubmit.
+            <div class="alert-time">Returned yesterday</div>
+          </div>
+          <div class="alert-action">View</div>
+        </div>
+        <div class="alert-item">
+          <div class="alert-icon amber">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
+          <div class="alert-text">
+            <strong>SUB-003</strong> — Sunridge submittal under review. Assigned to engineering team.
+            <div class="alert-time">Received Feb 1, 2026</div>
+          </div>
+          <div class="alert-action">Review</div>
+        </div>
+        <div class="alert-item">
+          <div class="alert-icon green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+          </div>
+          <div class="alert-text">
+            <strong>208301-002</strong> engineering drawings ready for upload. Sealed stamp received from engineer.
+            <div class="alert-time">Ready to publish to customer</div>
+          </div>
+          <div class="alert-action">Upload</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">Quick Actions</div></div>
+        <div class="quick-action-grid">
+          <div class="quick-action">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div><div class="quick-action-label">Upload Documents</div><div class="quick-action-sub">Push PDFs to customer</div></div>
+          </div>
+          <div class="quick-action">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+            <div><div class="quick-action-label">Add Customer</div><div class="quick-action-sub">New account setup</div></div>
+          </div>
+          <div class="quick-action">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <div><div class="quick-action-label">Generate QR Labels</div><div class="quick-action-sub">Print truss stickers</div></div>
+          </div>
+          <div class="quick-action">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            <div><div class="quick-action-label">Post Invoice</div><div class="quick-action-sub">Publish to customer</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">Production Status</div></div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:12px;">
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:11px;color:var(--text-dim)">Jobs In Production</span>
+              <span style="font-size:11px;font-weight:600;color:var(--text)">8 / 12</span>
+            </div>
+            <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:66%"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:11px;color:var(--text-dim)">Delivered This Month</span>
+              <span style="font-size:11px;font-weight:600;color:var(--text)">18 / 22 target</span>
+            </div>
+            <div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:82%"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:11px;color:var(--text-dim)">RFI Response Rate (&lt;24hr)</span>
+              <span style="font-size:11px;font-weight:600;color:var(--amber)">60%</span>
+            </div>
+            <div class="progress-bar-bg"><div class="progress-bar-fill amber" style="width:60%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Customer List -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">Active Customers</div>
+      <span class="panel-link">Manage All →</span>
+    </div>
+    <div>
+      <div class="customer-row">
+        <div class="cust-avatar" style="background:linear-gradient(135deg,#8B0000,#C8102E)">JH</div>
+        <div class="cust-info"><div class="cust-name">Hartwell Construction LLC</div><div class="cust-meta">James Hartwell &nbsp;·&nbsp; Account #HC-0042</div></div>
+        <div class="cust-stats">
+          <div><div class="cust-stat-val">3</div><div class="cust-stat-lbl">Active Jobs</div></div>
+          <div><div class="cust-stat-val" style="color:var(--amber)">2</div><div class="cust-stat-lbl">Open RFIs</div></div>
+          <div><div class="cust-stat-val">$14.6K</div><div class="cust-stat-lbl">Outstanding</div></div>
+          <span class="badge badge-green" style="align-self:center">Active</span>
+        </div>
+      </div>
+      <div class="customer-row">
+        <div class="cust-avatar" style="background:linear-gradient(135deg,#1a3a5c,#2e6da4)">BR</div>
+        <div class="cust-info"><div class="cust-name">Blue Ridge Builders Inc.</div><div class="cust-meta">Mike Sorenson &nbsp;·&nbsp; Account #BR-0018</div></div>
+        <div class="cust-stats">
+          <div><div class="cust-stat-val">1</div><div class="cust-stat-lbl">Active Jobs</div></div>
+          <div><div class="cust-stat-val">0</div><div class="cust-stat-lbl">Open RFIs</div></div>
+          <div><div class="cust-stat-val">$0</div><div class="cust-stat-lbl">Outstanding</div></div>
+          <span class="badge badge-green" style="align-self:center">Active</span>
+        </div>
+      </div>
+      <div class="customer-row">
+        <div class="cust-avatar" style="background:linear-gradient(135deg,#2d5a27,#4a9e3f)">KV</div>
+        <div class="cust-info"><div class="cust-name">Knox Valley Contracting</div><div class="cust-meta">Dana Pruitt &nbsp;·&nbsp; Account #KV-0055</div></div>
+        <div class="cust-stats">
+          <div><div class="cust-stat-val">2</div><div class="cust-stat-lbl">Active Jobs</div></div>
+          <div><div class="cust-stat-val">1</div><div class="cust-stat-lbl">Open RFIs</div></div>
+          <div><div class="cust-stat-val">$7.7K</div><div class="cust-stat-lbl">Outstanding</div></div>
+          <span class="badge badge-green" style="align-self:center">Active</span>
+        </div>
+      </div>
+      <div class="customer-row">
+        <div class="cust-avatar" style="background:linear-gradient(135deg,#5a3a1a,#a0642a)">SH</div>
+        <div class="cust-info"><div class="cust-name">Summit Home Builders</div><div class="cust-meta">Rachel Torres &nbsp;·&nbsp; Account #SH-0071</div></div>
+        <div class="cust-stats">
+          <div><div class="cust-stat-val">0</div><div class="cust-stat-lbl">Active Jobs</div></div>
+          <div><div class="cust-stat-val">0</div><div class="cust-stat-lbl">Open RFIs</div></div>
+          <div><div class="cust-stat-val">$0</div><div class="cust-stat-lbl">Outstanding</div></div>
+          <span class="badge badge-gray" style="align-self:center">Inactive</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Customers stub -->
+<div id="view-admin-customers" style="display:none" class="fade-in">
+  <div class="panel">
+    <div class="panel-header"><div class="panel-title">Customer Accounts</div><button class="btn btn-primary"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Customer</button></div>
+    <div>
+      <div class="customer-row"><div class="cust-avatar" style="background:linear-gradient(135deg,#8B0000,#C8102E)">JH</div><div class="cust-info"><div class="cust-name">Hartwell Construction LLC</div><div class="cust-meta">james@hartwellconstruction.com &nbsp;·&nbsp; Account #HC-0042 &nbsp;·&nbsp; Registered Jan 5, 2026</div></div><div style="margin-left:auto;display:flex;gap:8px;align-items:center"><span class="badge badge-green">Approved</span><div class="doc-dl-btn">Manage</div></div></div>
+      <div class="customer-row"><div class="cust-avatar" style="background:linear-gradient(135deg,#1a3a5c,#2e6da4)">BR</div><div class="cust-info"><div class="cust-name">Blue Ridge Builders Inc.</div><div class="cust-meta">mike.s@blueridgebuilders.com &nbsp;·&nbsp; Account #BR-0018 &nbsp;·&nbsp; Registered Oct 12, 2025</div></div><div style="margin-left:auto;display:flex;gap:8px;align-items:center"><span class="badge badge-green">Approved</span><div class="doc-dl-btn">Manage</div></div></div>
+      <div class="customer-row"><div class="cust-avatar" style="background:linear-gradient(135deg,#2d5a27,#4a9e3f)">KV</div><div class="cust-info"><div class="cust-name">Knox Valley Contracting</div><div class="cust-meta">dpruitt@knoxvalley.com &nbsp;·&nbsp; Account #KV-0055 &nbsp;·&nbsp; Registered Nov 3, 2025</div></div><div style="margin-left:auto;display:flex;gap:8px;align-items:center"><span class="badge badge-green">Approved</span><div class="doc-dl-btn">Manage</div></div></div>
+      <div class="customer-row"><div class="cust-avatar" style="background:linear-gradient(135deg,#444,#666)">NP</div><div class="cust-info"><div class="cust-name">Nathan Pierce Homes</div><div class="cust-meta">nathan@piercehomes.com &nbsp;·&nbsp; No account number yet &nbsp;·&nbsp; Registered Feb 2, 2026</div></div><div style="margin-left:auto;display:flex;gap:8px;align-items:center"><span class="badge badge-amber">Pending Approval</span><div class="btn btn-primary" style="font-size:11px;padding:5px 12px">Approve</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Admin All RFIs stub -->
+<div id="view-admin-rfis" style="display:none" class="fade-in">
+  <div style="display:flex;gap:10px;margin-bottom:4px;align-items:center;">
+    <button class="filter-chip active">All</button>
+    <button class="filter-chip">Awaiting Response</button>
+    <button class="filter-chip">Answered</button>
+    <div style="margin-left:auto;font-size:12px;color:var(--text-dim)">Showing all RFIs across all customers</div>
+  </div>
+  <div class="panel">
+    <div class="rfi-full-list">
+      <div class="rfi-full-item">
+        <div class="rfi-full-header">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span class="rfi-id">RFI-006</span>
+            <span style="font-size:12px;font-weight:600;color:var(--text)">Ridge board height — 208240-003</span>
+            <span style="font-size:10px;color:var(--muted)">Hartwell Construction</span>
+            <span class="badge badge-red" style="font-size:9px">URGENT</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="badge badge-amber">Awaiting Response</span>
+            <button class="btn btn-primary" style="font-size:11px;padding:5px 12px">Respond</button>
+          </div>
+        </div>
+        <div class="rfi-thread">
+          <div class="rfi-msg">
+            <div class="rfi-msg-avatar avatar-cust">JH</div>
+            <div class="rfi-bubble"><div class="sender">James Hartwell &nbsp;·&nbsp; Hartwell Construction LLC</div><div class="message">The ridge board height shown on the layout doesn't match our architect's ceiling height spec at 9'-6". Please confirm or provide a revised truss profile for the great room section (trusses D01–D06).</div><div class="ts">Jan 30, 2026 at 11:02 AM</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="rfi-full-item">
+        <div class="rfi-full-header">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span class="rfi-id">RFI-005</span>
+            <span style="font-size:12px;font-weight:600;color:var(--text)">Heel height clarification — 208240-003</span>
+            <span style="font-size:10px;color:var(--muted)">Hartwell Construction</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="badge badge-amber">Awaiting Response</span>
+            <button class="btn btn-primary" style="font-size:11px;padding:5px 12px">Respond</button>
+          </div>
+        </div>
+        <div class="rfi-thread">
+          <div class="rfi-msg">
+            <div class="rfi-msg-avatar avatar-cust">JH</div>
+            <div class="rfi-bubble"><div class="sender">James Hartwell</div><div class="message">Can you confirm heel height on the perimeter trusses? Our energy spec requires R-38 at the eave and I need to verify we have adequate space.</div><div class="ts">Jan 25, 2026</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Upload Docs stub -->
+<div id="view-admin-docs" style="display:none" class="fade-in">
+  <div class="panel">
+    <div class="panel-header"><div class="panel-title">Upload Documents to Customer Jobs</div></div>
+    <div class="modal-body" style="border:none">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Customer <span>*</span></label><select class="form-select"><option>Hartwell Construction LLC</option><option>Blue Ridge Builders Inc.</option><option>Knox Valley Contracting</option></select></div>
+        <div class="form-group"><label class="form-label">Job <span>*</span></label><select class="form-select"><option>208240-003 — Ridgeline Commons Bldg A</option><option>208301-002 — Sunridge Custom Residence</option></select></div>
+      </div>
+      <div class="form-group"><label class="form-label">Document Type <span>*</span></label><select class="form-select"><option>Sealed Engineering Drawings</option><option>Truss Layout Plan</option><option>Placement Diagram</option><option>Invoice</option><option>Other</option></select></div>
+      <div class="form-group"><label class="form-label">File</label>
+        <div class="upload-zone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div class="up-label">Drop PDF here or click to browse</div>
+          <div class="up-hint">PDF only &nbsp;·&nbsp; File will be immediately visible to the customer after upload</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px">
+        <button class="btn btn-ghost">Clear</button>
+        <button class="btn btn-primary">Upload &amp; Publish to Customer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     RFI SUBMISSION MODAL
+════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="rfi-modal" onclick="closeRFIModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h2>Submit a New RFI</h2>
+        <div class="modal-sub">Request for Information — your question will be logged and responded to by our team</div>
+      </div>
+      <div class="modal-close" onclick="closeModal('rfi-modal')">&#x2715;</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Job Number <span>*</span></label>
+          <select class="form-select">
+            <option value="">Select a job…</option>
+            <option selected>208240-003 — Ridgeline Commons Bldg A</option>
+            <option>208301-002 — Sunridge Custom Residence</option>
+            <option>208135-001 — Maplewood Estates Phase 2</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Related Truss / Area <span></span></label>
+          <select class="form-select">
+            <option value="">Select truss (optional)…</option>
+            <option>D01 — Common Truss</option>
+            <option>D02 — Common Truss</option>
+            <option>E03 — End Jack</option>
+            <option>F01 — Scissor</option>
+            <option>General / Whole Job</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Priority <span>*</span></label>
+        <div style="display:flex;gap:8px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-dim)">
+            <input type="radio" name="priority" value="normal" checked style="accent-color:var(--red)"> Normal
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--amber)">
+            <input type="radio" name="priority" value="urgent" style="accent-color:var(--amber)"> Urgent — Job Schedule Impacted
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">RFI Subject <span>*</span></label>
+        <input class="form-input" type="text" placeholder="Brief description of your question…" value="Ridge board height — great room section">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Question / Description <span>*</span></label>
+        <textarea class="form-textarea" placeholder="Describe your question in detail. Include any relevant measurements, spec references, or context that will help our engineering team respond accurately…">The ridge board height shown on the layout does not match our architect's ceiling height spec at 9'-6". Please confirm or provide a revised truss profile for the great room section (trusses D01–D06).</textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Attachments <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+        <div class="upload-zone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div class="up-label">Drop files here or click to browse</div>
+          <div class="up-hint">PDF, DWG, JPG — max 25 MB per file</div>
+        </div>
+      </div>
+
+      <div style="background:var(--red-dim);border:1px solid rgba(200,16,46,0.2);border-radius:6px;padding:12px 14px;">
+        <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:4px;">What happens next?</div>
+        <div style="font-size:12px;color:var(--text-dim);line-height:1.5;">Your RFI will be assigned to our engineering team. You will receive a notification when a response is posted — typically within one business day. The full thread will be saved permanently to your job record.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('rfi-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitRFI()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+        Submit RFI
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MOBILE PREVIEW BUTTON ───────────────────────────── -->
+<div class="mobile-preview-wrap">
+  <div class="mobile-panel" id="mobile-panel">
+    <div class="phone-frame">
+      <div class="phone-status">9:41 AM &nbsp;·&nbsp; BuilderConnect</div>
+      <div class="phone-header">
+        <div class="phone-logo">BC</div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--white)">BuilderConnect</div>
+          <div class="phone-greeting">Welcome back, James</div>
+        </div>
+      </div>
+      <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">My Active Jobs</div>
+      <div class="phone-jobs">
+        <div class="phone-job">
+          <div><div class="phone-job-num">208240-003</div><div class="phone-job-name">Ridgeline Commons Bldg A</div></div>
+          <span class="badge badge-amber" style="font-size:9px">In Prod</span>
+        </div>
+        <div class="phone-job">
+          <div><div class="phone-job-num">208301-002</div><div class="phone-job-name">Sunridge Custom Residence</div></div>
+          <span class="badge badge-blue" style="font-size:9px">Sched</span>
+        </div>
+        <div class="phone-job">
+          <div><div class="phone-job-num">208135-001</div><div class="phone-job-name">Maplewood Estates Ph 2</div></div>
+          <span class="badge badge-green" style="font-size:9px">Done</span>
+        </div>
+      </div>
+      <button class="phone-scan-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="16,3 21,3 21,8"/><line x1="14" y1="10" x2="21" y2="3"/><polyline points="8,21 3,21 3,16"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+        Scan Truss QR Code
+      </button>
+    </div>
+  </div>
+  <button class="mobile-toggle" onclick="toggleMobile()" title="Preview Mobile App">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18" stroke-width="3"/></svg>
+  </button>
+</div>
+
+<script>
+  // ── Navigation ──────────────────────────────────────────────
+  const views = ['dashboard','jobs','documents','rfis','submittals','invoices'];
+  const titles = {
+    dashboard: ['Dashboard','BuilderConnect › Overview'],
+    jobs:      ['My Jobs','BuilderConnect › Jobs'],
+    documents: ['Documents','BuilderConnect › Documents'],
+    rfis:      ['RFIs','BuilderConnect › RFIs'],
+    submittals:['Submittals','BuilderConnect › Submittals'],
+    invoices:  ['Invoices','BuilderConnect › Invoices'],
+  };
+
+  let currentView = 'dashboard';
+
+  function showView(name) {
+    views.forEach(v => {
+      const el = document.getElementById('view-' + v);
+      if (el) el.style.display = v === name ? '' : 'none';
+    });
+    if (titles[name]) {
+      document.getElementById('page-title').textContent = titles[name][0];
+      const parts = titles[name][1].split(' › ');
+      document.getElementById('breadcrumb').innerHTML =
+        parts.slice(0,-1).map(p => `<span>${p}</span><span class="sep">›</span>`).join('') +
+        `<span class="current">${parts[parts.length-1]}</span>`;
+    }
+    currentView = name;
+    // reset job detail if leaving jobs
+    if (name !== 'jobs') {
+      document.getElementById('jobs-list-view').classList.remove('hidden');
+      document.getElementById('job-detail-view').classList.remove('active');
+      document.getElementById('back-btn').style.display = 'none';
+    }
+  }
+
+  function switchNav(el, viewName) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+    showView(viewName);
+    // animate
+    const v = document.getElementById('view-' + viewName);
+    if (v) { v.classList.remove('fade-in'); void v.offsetWidth; v.classList.add('fade-in'); }
+  }
+
+  function switchNavByName(viewName) {
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(n => {
+      if (n.getAttribute('onclick') && n.getAttribute('onclick').includes("'" + viewName + "'")) {
+        n.classList.add('active');
+      } else {
+        n.classList.remove('active');
+      }
+    });
+    showView(viewName);
+  }
+
+  // ── Job Detail ──────────────────────────────────────────────
+  function openJob(num, name) {
+    document.getElementById('detail-job-num').textContent = num;
+    document.getElementById('detail-job-name').textContent = name;
+    document.getElementById('jobs-list-view').classList.add('hidden');
+    document.getElementById('job-detail-view').classList.add('active');
+    document.getElementById('back-btn').style.display = 'flex';
+    // reset to first tab
+    switchTab(document.querySelector('#job-tabs .tab'), 'trusses');
+    // ensure jobs view is visible
+    showView('jobs');
+    switchNavByName('jobs');
+  }
+
+  function goBack() {
+    document.getElementById('jobs-list-view').classList.remove('hidden');
+    document.getElementById('job-detail-view').classList.remove('active');
+    document.getElementById('back-btn').style.display = 'none';
+  }
+
+  // ── Tabs ────────────────────────────────────────────────────
+  function switchTab(el, tabName) {
+    el.closest('.tabs').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    const tc = document.getElementById('tab-' + tabName);
+    if (tc) tc.classList.add('active');
+  }
+
+  // ── Filter chips toggle ─────────────────────────────────────
+  document.querySelectorAll('.filter-chip').forEach(chip => {
+    chip.addEventListener('click', function() {
+      this.closest('div').querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
+
+  // ── View pill toggle ────────────────────────────────────────
+  document.querySelectorAll('.view-opt').forEach(opt => {
+    opt.addEventListener('click', function() {
+      this.closest('.view-pill').querySelectorAll('.view-opt').forEach(o => o.classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
+
+  // ── Mobile Panel ────────────────────────────────────────────
+  function toggleMobile() {
+    document.getElementById('mobile-panel').classList.toggle('open');
+  }
+
+  // ── Mode Switcher ─────────────────────────────────────────
+  let currentMode = 'customer';
+
+  function setMode(mode) {
+    currentMode = mode;
+    const app = document.querySelector('.app');
+    const adminBanner = document.getElementById('admin-banner');
+    const adminNav = document.getElementById('admin-nav-section');
+    const btnCustomer = document.getElementById('btn-customer');
+    const btnAdmin = document.getElementById('btn-admin');
+    const allViews = document.querySelectorAll('[id^="view-"]');
+
+    if (mode === 'admin') {
+      app.classList.add('admin-mode');
+      adminBanner.style.display = 'flex';
+      adminNav.style.display = 'block';
+      btnAdmin.classList.add('active-admin');
+      btnCustomer.classList.remove('active-customer');
+      // deactivate all customer nav
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      // switch to admin dashboard
+      const adminNavItem = document.querySelector('[onclick*="admin-dashboard"]');
+      if (adminNavItem) adminNavItem.classList.add('active');
+      allViews.forEach(v => v.style.display = 'none');
+      document.getElementById('view-admin-dashboard').style.display = '';
+      document.getElementById('page-title').textContent = 'Admin Dashboard';
+      document.getElementById('breadcrumb').innerHTML = '<span>BuilderConnect</span><span class="sep">›</span><span class="current">Admin Overview</span>';
+    } else {
+      app.classList.remove('admin-mode');
+      adminBanner.style.display = 'none';
+      adminNav.style.display = 'none';
+      btnCustomer.classList.add('active-customer');
+      btnAdmin.classList.remove('active-admin');
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      const dashNav = document.querySelector('[onclick*="\'dashboard\'"]');
+      if (dashNav) dashNav.classList.add('active');
+      allViews.forEach(v => v.style.display = 'none');
+      document.getElementById('view-dashboard').style.display = '';
+      document.getElementById('page-title').textContent = 'Dashboard';
+      document.getElementById('breadcrumb').innerHTML = '<span>BuilderConnect</span><span class="sep">›</span><span class="current">Overview</span>';
+    }
+  }
+
+  // extend views array for admin
+  views.push('admin-dashboard','admin-customers','admin-rfis','admin-docs');
+  titles['admin-dashboard'] = ['Admin Dashboard','BuilderConnect › Admin › Overview'];
+  titles['admin-customers'] = ['Customer Accounts','BuilderConnect › Admin › Customers'];
+  titles['admin-rfis']      = ['All RFIs','BuilderConnect › Admin › RFIs'];
+  titles['admin-docs']      = ['Upload Documents','BuilderConnect › Admin › Upload'];
+
+  // ── RFI Modal ─────────────────────────────────────────────
+  function openRFIModal() {
+    document.getElementById('rfi-modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  function closeRFIModal(e) {
+    if (e.target === e.currentTarget) closeModal('rfi-modal');
+  }
+  function submitRFI() {
+    const modal = document.getElementById('rfi-modal');
+    const body = modal.querySelector('.modal-body');
+    body.innerHTML = `
+      <div style="text-align:center;padding:30px 20px;">
+        <div style="width:56px;height:56px;background:rgba(46,204,113,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2ECC71" stroke-width="2.5"><polyline points="20,6 9,17 4,12"/></svg>
+        </div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:var(--white);margin-bottom:8px;">RFI Submitted Successfully</div>
+        <div style="font-size:13px;color:var(--text-dim);line-height:1.6;max-width:380px;margin:0 auto;">
+          <strong style="color:var(--text)">RFI-007</strong> has been created and assigned to our engineering team.<br><br>
+          You will receive a notification when a response is posted. The full thread is now visible in your job record for <strong style="color:var(--text)">208240-003</strong>.
+        </div>
+        <div style="margin-top:20px;padding:12px 16px;background:var(--red-dim);border:1px solid rgba(200,16,46,0.2);border-radius:6px;font-size:12px;color:var(--text-dim);">
+          Typical response time: <strong style="color:var(--text)">within 1 business day</strong>
+        </div>
+      </div>`;
+    modal.querySelector('.modal-footer').innerHTML = `<button class="btn btn-primary" onclick="closeModal('rfi-modal')">Done</button>`;
+  }
+
+  // Wire up all "New RFI" buttons to open the modal
+  document.querySelectorAll('[onclick*="New RFI"], .btn-primary').forEach(btn => {
+    if (btn.textContent.trim() === 'New RFI') {
+      btn.removeAttribute('onclick');
+      btn.addEventListener('click', openRFIModal);
+    }
+  });
+  document.getElementById('new-rfi-btn').addEventListener('click', openRFIModal);
+</script>
+</body>
+</html>
