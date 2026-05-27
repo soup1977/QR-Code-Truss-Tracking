@@ -1,4 +1,4 @@
-; BuildersQRLabels.iss — Inno Setup 6 installer script for Builders Connect
+; BuildersQRLabels.iss — Inno Setup 6 installer script for Builders Truss QR
 ;
 ; Prerequisites:
 ;   1. Run PyInstaller first:  pyinstaller BuildersQRLabels.spec --clean --noconfirm
@@ -7,13 +7,13 @@
 ; Usage (from project root):
 ;   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\BuildersQRLabels.iss
 ;
-; Output: Output\BuildersConnect-0.9.0-Setup.exe
+; Output: Output\BuildersTrussQR-0.9.0-Setup.exe
 
-#define AppName      "Builders Connect"
+#define AppName      "Builders Truss QR"
 #define AppVersion   "0.9.0"
 #define AppPublisher "Builders Inc."
 #define AppExeName   "BuildersQRLabels.exe"
-#define AppDir       "BuildersConnect"
+#define AppDir       "BuildersTrussQR"
 
 [Setup]
 AppId={{A3F8B2C1-4D7E-4A9F-B6C2-1E5D8F3A7B9C}
@@ -28,7 +28,7 @@ AllowNoIcons=yes
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=..\Output
-OutputBaseFilename=BuildersConnect-{#AppVersion}-Setup
+OutputBaseFilename=BuildersTrussQR-{#AppVersion}-Setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern

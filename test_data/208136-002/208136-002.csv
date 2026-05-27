@@ -1,0 +1,9 @@
+jobnumber,trsname,trusstype,batch,customer,jobname,qty,ply
+208136-002,TC01,Common Truss,B01,Johnson Builders LLC,Oak Park Residential,10,1
+208136-002,TC02,Common Truss,B01,Johnson Builders LLC,Oak Park Residential,10,1
+208136-002,TC03,Common Truss,B01,Johnson Builders LLC,Oak Park Residential,8,1
+208136-002,TC04,Common Truss,B02,Johnson Builders LLC,Oak Park Residential,8,1
+208136-002,HIP1,Hip Truss,B02,Johnson Builders LLC,Oak Park Residential,5,2
+208136-002,HIP2,Hip Truss,B02,Johnson Builders LLC,Oak Park Residential,5,2
+208136-002,GAB1,Gable End,B02,Johnson Builders LLC,Oak Park Residential,2,1
+208136-002,GIR1,Girder Truss,B02,Johnson Builders LLC,Oak Park Residential,4,2

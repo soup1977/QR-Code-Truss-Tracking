@@ -1,5 +1,5 @@
 # BuildersQRLabels.spec
-# PyInstaller build spec for Builders Connect.
+# PyInstaller build spec for Builders Truss QR.
 #
 # Usage (from project root, with .venv active):
 #   pyinstaller BuildersQRLabels.spec --clean --noconfirm
@@ -67,8 +67,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    # Uncomment and set path if you have an .ico file:
-    # icon="icons\\app.ico",
+    icon="icons\\trussQR.ico",
     version_info=None,
 )
 

@@ -1,0 +1,11 @@
+jobnumber,trsname,trusstype,batch,customer,jobname,qty,ply
+208075-001,A01,Common Truss,G01,Sunrise Contractors,Willow Creek Phase 2,20,1
+208075-001,A02,Common Truss,G01,Sunrise Contractors,Willow Creek Phase 2,20,1
+208075-001,A03,Common Truss,G01,Sunrise Contractors,Willow Creek Phase 2,18,1
+208075-001,A04,Common Truss,G01,Sunrise Contractors,Willow Creek Phase 2,18,1
+208075-001,A05,Common Truss,G02,Sunrise Contractors,Willow Creek Phase 2,15,1
+208075-001,B01,Hip Truss,G02,Sunrise Contractors,Willow Creek Phase 2,10,2
+208075-001,B02,Hip Truss,G02,Sunrise Contractors,Willow Creek Phase 2,10,2
+208075-001,C01,Gable End,G02,Sunrise Contractors,Willow Creek Phase 2,2,1
+208075-001,D01,Valley Set,G02,Sunrise Contractors,Willow Creek Phase 2,6,1
+208075-001,E01,Girder Truss,G02,Sunrise Contractors,Willow Creek Phase 2,4,3

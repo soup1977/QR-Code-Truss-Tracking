@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Builders — Sales Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow:wght@300;400;500;600;700;800&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --red:#E53427; --red-dk:#C42B21; --red-dim:rgba(229,52,39,0.10); --red-border:rgba(229,52,39,0.28);
+  --bg:#0a0a0a; --surf:#141414; --surf2:#1c1c1c; --surf3:#242424;
+  --brd:#272727; --brd2:#353535;
+  --txt:#f0f0f0; --txt2:#a0a0a0; --txt3:#585858;
+  --green:#22c55e; --blue:#3b82f6; --yellow:#f59e0b; --purple:#a855f7;
+  --sidebar:226px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Barlow',sans-serif;background:var(--bg);color:var(--txt);display:flex;height:100vh;overflow:hidden;font-size:14px}
+
+/* ── SIDEBAR ── */
+.sidebar{width:var(--sidebar);background:var(--surf);border-right:1px solid var(--brd);display:flex;flex-direction:column;flex-shrink:0;z-index:10}
+.logo-area{padding:16px 16px 14px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:10px}
+.logo-img{height:30px;width:auto;filter:brightness(0) invert(1)}
+.portal-pill{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);border-left:2px solid var(--red);padding-left:6px;line-height:1.4}
+.user-chip{margin:10px 12px 6px;background:var(--surf2);border:1px solid var(--brd);border-radius:8px;padding:9px 11px;display:flex;align-items:center;gap:9px}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:#fff;flex-shrink:0;font-family:'Barlow Condensed',sans-serif;letter-spacing:.04em}
+.u-name{font-weight:700;font-size:13px}
+.u-role{font-size:10px;color:var(--txt3);margin-top:1px}
+.role-toggle{margin:0 12px 8px;display:flex;gap:6px}
+.role-btn{flex:1;padding:5px;background:var(--surf2);border:1px solid var(--brd2);border-radius:5px;color:var(--txt3);font-size:11px;font-weight:600;cursor:pointer;font-family:'Barlow',sans-serif;transition:all .15s;text-align:center}
+.role-btn.active{background:var(--red-dim);border-color:var(--red-border);color:var(--red)}
+nav{padding:4px 0;flex:1;overflow-y:auto}
+.nav-sec{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt3);padding:11px 17px 3px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 17px;cursor:pointer;color:var(--txt2);font-weight:500;font-size:13px;border-left:3px solid transparent;transition:all .14s;user-select:none}
+.nav-item:hover{color:var(--txt);background:var(--surf2)}
+.nav-item.active{color:var(--red);border-left-color:var(--red);background:var(--red-dim)}
+.nav-ico{font-size:14px;width:17px;text-align:center}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-family:'DM Mono',monospace;font-size:9px;padding:1px 6px;border-radius:10px}
+.nav-badge.warn{background:var(--yellow);color:#000}
+.sidebar-foot{border-top:1px solid var(--brd);padding:10px 12px}
+.sync-row{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--txt3);padding:4px}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── TOPBAR ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:52px;background:var(--surf);border-bottom:1px solid var(--brd);display:flex;align-items:center;padding:0 22px;gap:14px;flex-shrink:0}
+.topbar-title{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;letter-spacing:.04em;flex:1}
+.topbar-title span{color:var(--txt3);font-weight:400}
+.btn{padding:7px 15px;border-radius:6px;font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .15s;letter-spacing:.01em}
+.btn-red{background:var(--red);color:#fff}.btn-red:hover{background:var(--red-dk)}
+.btn-ghost{background:transparent;color:var(--txt2);border:1px solid var(--brd2)}.btn-ghost:hover{color:var(--txt);border-color:var(--txt3)}
+.bell{position:relative;width:34px;height:34px;border-radius:7px;border:1px solid var(--brd2);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--txt2);transition:all .15s}
+.bell:hover{border-color:var(--red);color:var(--red)}
+.bell-pip{position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--red);border:1px solid var(--surf)}
+.content{flex:1;overflow-y:auto;padding:22px}
+.page{display:none;animation:fadeUp .2s ease}.page.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+/* ── MANAGER BANNER ── */
+.mgr-banner{background:var(--red-dim);border:1px solid var(--red-border);border-radius:8px;padding:9px 15px;margin-bottom:16px;font-size:12px;display:none;align-items:center;gap:10px;color:var(--txt2)}
+.mgr-banner.show{display:flex}
+.mgr-banner select{background:var(--surf2);border:1px solid var(--red-border);border-radius:5px;padding:4px 8px;color:var(--txt);font-size:12px;outline:none;margin-left:4px}
+
+/* ── NOTIF BANNER ── */
+.notif-bar{background:var(--surf);border:1px solid var(--brd);border-left:3px solid var(--red);border-radius:8px;padding:11px 15px;margin-bottom:18px;display:flex;align-items:center;gap:12px;animation:slideDown .3s ease}
+@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.notif-list{flex:1;display:flex;flex-direction:column;gap:4px}
+.notif-row{font-size:12px;display:flex;gap:7px;align-items:center}
+.ndot{width:5px;height:5px;border-radius:50%;background:var(--red);flex-shrink:0}.ndot.y{background:var(--yellow)}
+.notif-dismiss{background:none;border:1px solid var(--brd2);border-radius:5px;padding:3px 9px;color:var(--txt3);font-size:10px;cursor:pointer;font-family:'Barlow',sans-serif;flex-shrink:0}
+.notif-dismiss:hover{color:var(--txt2)}
+
+/* ── STATS ── */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:20px}
+.stat{background:var(--surf);border:1px solid var(--brd);border-radius:10px;padding:15px 17px;position:relative;overflow:hidden}
+.stat::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--red);transform:scaleX(0);transition:transform .2s;transform-origin:left}
+.stat:hover::after{transform:scaleX(1)}
+.stat-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);margin-bottom:6px}
+.stat-val{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:800;line-height:1}
+.stat-sub{font-size:11px;color:var(--txt3);margin-top:4px}
+.cr{color:var(--red)}.cg{color:var(--green)}.cy{color:var(--yellow)}.cb{color:var(--blue)}.cw{color:var(--txt)}
+
+/* ── TABLE ── */
+.tbl-wrap{background:var(--surf);border:1px solid var(--brd);border-radius:10px;overflow:hidden;margin-bottom:18px}
+.tbl-head{display:flex;align-items:center;padding:13px 17px;border-bottom:1px solid var(--brd);gap:9px;flex-wrap:wrap}
+.tbl-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:16px;letter-spacing:.04em;flex:1}
+.srch{background:var(--bg);border:1px solid var(--brd2);border-radius:6px;padding:6px 11px;color:var(--txt);font-family:'Barlow',sans-serif;font-size:13px;width:180px;outline:none;transition:border .15s}
+.srch:focus{border-color:var(--red)}.srch::placeholder{color:var(--txt3)}
+.fsel{background:var(--bg);border:1px solid var(--brd2);border-radius:6px;padding:6px 9px;color:var(--txt2);font-family:'Barlow',sans-serif;font-size:12px;outline:none;cursor:pointer}
+.fsel:focus{border-color:var(--red)}
+table{width:100%;border-collapse:collapse}
+thead tr{background:var(--bg)}
+th{font-family:'DM Mono',monospace;font-size:9px;font-weight:500;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);padding:9px 13px;text-align:left;border-bottom:1px solid var(--brd);white-space:nowrap}
+td{padding:10px 13px;border-bottom:1px solid var(--brd);font-size:13px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr{transition:background .1s;cursor:pointer}
+tbody tr:hover{background:rgba(229,52,39,.04)}
+.g-q{border-left:3px solid var(--blue)}
+.g-h{border-left:3px solid var(--yellow)}
+.g-s{border-left:3px solid var(--green)}
+.g-d{border-left:3px solid var(--txt3)}
+.g-x{border-left:3px solid var(--red);opacity:.6}
+.nm{font-weight:700;color:var(--txt)}.sub{font-size:11px;color:var(--txt3);margin-top:2px}
+.mono{font-family:'DM Mono',monospace;font-size:12px}
+.money{font-family:'DM Mono',monospace;font-size:12px;color:var(--green)}
+.dt{font-family:'DM Mono',monospace;font-size:11px;color:var(--txt3)}
+.overdue{color:var(--red)!important;font-weight:700}
+.soon{color:var(--yellow)!important}
+.tags{display:flex;flex-wrap:wrap;gap:3px}
+.tag{font-size:9px;padding:2px 6px;background:var(--surf2);border:1px solid var(--brd2);border-radius:3px;color:var(--txt3);font-family:'DM Mono',monospace}
+.abtn{padding:4px 9px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--brd2);background:transparent;color:var(--txt3);font-family:'Barlow',sans-serif;transition:all .15s;white-space:nowrap}
+.abtn:hover,.abtn.p{border-color:var(--red);color:var(--red);background:var(--red-dim)}
+.abtn.scope{border-color:var(--yellow);color:var(--yellow);background:rgba(245,158,11,.08)}
+.abtn.scope:hover{background:rgba(245,158,11,.15)}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;padding:3px 7px;border-radius:4px;font-family:'DM Mono',monospace;font-size:9px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.b-blue{background:rgba(59,130,246,.14);color:#60a5fa;border:1px solid rgba(59,130,246,.28)}
+.b-yellow{background:rgba(245,158,11,.14);color:#fbbf24;border:1px solid rgba(245,158,11,.28)}
+.b-green{background:rgba(34,197,94,.14);color:#4ade80;border:1px solid rgba(34,197,94,.28)}
+.b-grey{background:rgba(96,96,96,.18);color:#9ca3af;border:1px solid rgba(96,96,96,.28)}
+.b-red{background:rgba(229,52,39,.14);color:#fca5a5;border:1px solid rgba(229,52,39,.25)}
+.b-solid-red{background:var(--red);color:#fff;border:1px solid var(--red)}
+.b-purple{background:rgba(168,85,247,.14);color:#c084fc;border:1px solid rgba(168,85,247,.28)}
+.b-orange{background:rgba(249,115,22,.14);color:#fb923c;border:1px solid rgba(249,115,22,.28)}
+
+/* ── PIPELINE ── */
+.pipe-wrap{display:grid;grid-template-columns:repeat(5,1fr);gap:11px}
+.pc{background:var(--surf);border:1px solid var(--brd);border-radius:10px;overflow:hidden}
+.pc-head{padding:11px 13px;border-bottom:1px solid var(--brd);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:7px}
+.pc-cnt{margin-left:auto;background:var(--surf2);border-radius:10px;padding:1px 7px;font-family:'DM Mono',monospace;font-size:9px;color:var(--txt3)}
+.pc-cards{padding:9px;display:flex;flex-direction:column;gap:7px}
+.pcard{background:var(--bg);border:1px solid var(--brd);border-radius:7px;padding:10px 11px;cursor:pointer;transition:border-color .15s}
+.pcard:hover{border-color:var(--red)}
+.pcard-name{font-weight:700;font-size:12px;margin-bottom:3px}
+.pcard-cust{font-size:10px;color:var(--txt3);margin-bottom:5px}
+.pcard-val{font-family:'DM Mono',monospace;font-size:11px;color:var(--green)}
+.pcard-dt{font-family:'DM Mono',monospace;font-size:10px;color:var(--txt3);margin-top:3px}
+.pcard-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+.pcard-tag{font-size:8px;padding:1px 5px;border-radius:3px;background:var(--surf2);color:var(--txt3);font-family:'DM Mono',monospace}
+.pe{text-align:center;padding:18px;color:var(--txt3);font-size:11px}
+
+/* ── DASHBOARD ── */
+.dash-note{background:var(--surf);border:1px solid var(--brd);border-left:3px solid var(--red);border-radius:8px;padding:13px 17px;margin-bottom:18px;display:flex;align-items:center;gap:12px;font-size:13px;color:var(--txt2);line-height:1.5}
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+.dc{background:var(--surf);border:1px solid var(--brd);border-radius:10px;padding:17px}
+.dc-title{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt3);margin-bottom:15px}
+.bar-row{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.bar-lbl{width:115px;font-size:11px;color:var(--txt2);flex-shrink:0;text-align:right}
+.bar-trk{flex:1;height:7px;background:var(--surf2);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;background:var(--red);transition:width .8s}
+.bar-fill.g{background:var(--green)}.bar-fill.b{background:var(--blue)}.bar-fill.gr{background:var(--txt3)}
+.bar-val{width:55px;font-family:'DM Mono',monospace;font-size:10px;color:var(--txt2)}
+.fn-step{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.fn-bar{height:25px;border-radius:4px;display:flex;align-items:center;padding:0 9px;font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:#fff}
+.fn-lbl{font-size:11px;color:var(--txt2);white-space:nowrap}
+.donut-wrap{display:flex;align-items:center;gap:18px}
+.donut{position:relative;width:96px;height:96px}
+.donut svg{transform:rotate(-90deg)}
+.donut-mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif}
+.donut-mid .big{font-size:22px;font-weight:800}.donut-mid .sm{font-size:9px;color:var(--txt3)}
+.legend{display:flex;flex-direction:column;gap:6px}
+.li{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt2)}
+.ld{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.tl-item{display:flex;gap:11px;align-items:flex-start;margin-bottom:12px}
+.tl-dot{width:7px;height:7px;border-radius:50%;background:var(--red);margin-top:4px;flex-shrink:0}
+.tl-dot.g{background:var(--green)}.tl-dot.b{background:var(--blue)}.tl-dot.gr{background:var(--txt3)}
+.tl-dt{font-family:'DM Mono',monospace;font-size:9px;color:var(--txt3);margin-top:3px}
+.tl-tx{font-size:12px}
+
+/* ── FORMS ── */
+.fw{max-width:840px}
+.fi-title{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:800;letter-spacing:.03em}
+.fi-sub{font-size:13px;color:var(--txt3);margin-top:3px}
+.fi-sub strong{color:var(--txt2)}
+.fcard{background:var(--surf);border:1px solid var(--brd);border-radius:10px;margin-bottom:13px;overflow:hidden}
+.fcard-head{padding:12px 19px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:9px;background:var(--bg)}
+.fcard-num{width:21px;height:21px;border-radius:50%;background:var(--red);color:#fff;font-weight:800;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Barlow Condensed',sans-serif}
+.fcard-title{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;letter-spacing:.04em}
+.fcard-body{padding:19px}
+
+/* ─ SCOPE SHEET CARD ─ */
+.scope-card{background:var(--surf);border:1px solid var(--yellow);border-radius:10px;margin-bottom:13px;overflow:hidden;display:none}
+.scope-card.visible{display:block;animation:fadeUp .25s ease}
+.scope-card-head{padding:12px 19px;border-bottom:1px solid rgba(245,158,11,.25);display:flex;align-items:center;gap:9px;background:rgba(245,158,11,.06)}
+.scope-card-badge{background:rgba(245,158,11,.18);border:1px solid rgba(245,158,11,.35);color:#fbbf24;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:4px;margin-left:auto}
+.scope-intro{padding:10px 19px;background:rgba(245,158,11,.04);border-bottom:1px solid rgba(245,158,11,.12);font-size:12px;color:var(--txt3);display:flex;align-items:center;gap:8px}
+
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.fg3{grid-template-columns:1fr 1fr 1fr}
+.fgroup{display:flex;flex-direction:column;gap:4px}
+.fgroup.s2{grid-column:span 2}.fgroup.s3{grid-column:span 3}
+label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3)}
+input[type=text],input[type=email],input[type=tel],input[type=number],input[type=date],select,textarea{background:var(--bg);border:1px solid var(--brd2);border-radius:6px;padding:7px 10px;color:var(--txt);font-family:'Barlow',sans-serif;font-size:13px;outline:none;transition:border .15s;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--red)}
+select option{background:var(--surf2)}
+textarea{resize:vertical;min-height:65px}
+.cbrow{display:flex;align-items:center;gap:7px;padding:7px 0}
+input[type=checkbox]{width:15px;height:15px;accent-color:var(--red);cursor:pointer}
+.cblbl{font-size:13px;font-weight:500;cursor:pointer}
+.multi-wrap{display:flex;flex-wrap:wrap;gap:5px;background:var(--bg);border:1px solid var(--brd2);border-radius:6px;padding:7px;min-height:40px}
+.mtag{padding:4px 9px;background:var(--red-dim);color:var(--red);border:1px solid var(--red-border);border-radius:4px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:all .12s;user-select:none}
+.mtag.off{background:var(--surf2);color:var(--txt3);border-color:var(--brd2)}
+.mtag:hover{border-color:var(--red);color:var(--red)}
+.form-actions{display:flex;gap:11px;align-items:center;margin:4px 0 44px}
+.save-ok{background:rgba(34,197,94,.11);border:1px solid rgba(34,197,94,.28);color:var(--green);padding:7px 13px;border-radius:6px;font-size:12px;font-weight:700;display:none;align-items:center;gap:5px}
+
+/* scope section header */
+.scope-sec{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--yellow);margin-bottom:12px;padding-bottom:5px;border-bottom:1px solid rgba(245,158,11,.18)}
+
+/* ── SLIDEOVER ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;backdrop-filter:blur(2px)}
+.overlay.open{display:flex;justify-content:flex-end}
+.slideover{width:700px;background:var(--surf);height:100vh;overflow-y:auto;border-left:1px solid var(--brd);animation:soIn .22s ease;display:flex;flex-direction:column}
+@keyframes soIn{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+.so-head{padding:17px 22px;border-bottom:1px solid var(--brd);display:flex;align-items:flex-start;gap:11px;flex-shrink:0;background:var(--bg)}
+.so-title{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;letter-spacing:.03em;flex:1}
+.so-bdgs{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap}
+.x-btn{width:29px;height:29px;border-radius:6px;border:1px solid var(--brd2);background:none;color:var(--txt3);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.x-btn:hover{color:var(--red);border-color:var(--red)}
+.so-qi{display:flex;flex-wrap:wrap;gap:14px;padding:10px 22px;border-bottom:1px solid var(--brd);background:var(--surf2);flex-shrink:0}
+.qi{font-size:11px;color:var(--txt3);display:flex;gap:4px;align-items:center}
+.qi strong{color:var(--txt2)}
+.so-tabs{display:flex;border-bottom:1px solid var(--brd);flex-shrink:0;background:var(--bg)}
+.so-tab{padding:9px 17px;cursor:pointer;font-size:13px;font-weight:600;color:var(--txt3);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;user-select:none}
+.so-tab:hover{color:var(--txt2)}
+.so-tab.active{color:var(--red);border-bottom-color:var(--red)}
+.so-tab.scope-tab.active{color:var(--yellow);border-bottom-color:var(--yellow)}
+.so-body{padding:19px 22px;flex:1}
+.so-tc{display:none}.so-tc.active{display:block}
+.so-foot{padding:13px 22px;border-top:1px solid var(--brd);display:flex;gap:9px;justify-content:flex-end;flex-shrink:0;background:var(--bg);align-items:center}
+.so-ok{margin-right:auto;background:rgba(34,197,94,.11);border:1px solid rgba(34,197,94,.28);color:var(--green);padding:5px 11px;border-radius:6px;font-size:11px;font-weight:700;display:none;align-items:center;gap:4px}
+
+/* scope tab accent */
+.so-tab.scope-tab{color:var(--yellow);opacity:.6}
+.so-tab.scope-tab.active{opacity:1}
+.scope-tab-notice{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:6px;padding:9px 13px;margin-bottom:16px;font-size:12px;color:var(--yellow);display:flex;gap:8px;align-items:center}
+
+/* estimating status badges */
+.est-status{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:5px;font-family:'DM Mono',monospace;font-size:10px;font-weight:500}
+.es-incoming{background:rgba(59,130,246,.14);color:#60a5fa;border:1px solid rgba(59,130,246,.28)}
+.es-assigned{background:rgba(245,158,11,.14);color:#fbbf24;border:1px solid rgba(245,158,11,.28)}
+.es-inprog{background:rgba(168,85,247,.14);color:#c084fc;border:1px solid rgba(168,85,247,.28)}
+.es-waiting{background:rgba(229,52,39,.14);color:#fca5a5;border:1px solid rgba(229,52,39,.25)}
+.es-done{background:rgba(34,197,94,.14);color:#4ade80;border:1px solid rgba(34,197,94,.28)}
+
+/* priority */
+.pri-high{color:var(--red);font-weight:700}
+.pri-med{color:var(--yellow)}
+.pri-low{color:var(--txt3)}
+
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:var(--txt3)}
+</style>
+</head>
+<body>
+
+<!-- ════ SIDEBAR ════ -->
+<aside class="sidebar">
+  <div class="logo-area">
+    <img class="logo-img" src="data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAA2ANgDASIAAhEBAxEB/8QAGwABAAICAwAAAAAAAAAAAAAAAAUGAQIEBwj/xAAtEAACAQMCBAQFBQAAAAAAAAAAAQIDBAUGERIhMYEHFEFhExUiUXEyQnKhwf/EABoBAQADAQEBAAAAAAAAAAAAAAACAwUGBAf/xAApEQEAAQMCBAQHAAAAAAAAAAAAAQIDEQQhBQYSMUFRYYETFCIjJHHx/9oADAMBAAIRAxEAPwDxkAAAAA2pwnUqRp04SnOT2jGK3bfsi96W8M8rkXGvlpPHWz58DW9WXb9vfn7Fw8G8dYU9K0MjG0pK8qzqKdZx3m0pNJb+i2+xOal1bhMBFxvbpTuNuVvS+qo+3p32MLVcRvVXJs2Kd42830bhHKuit6WjXcQufTMROO0b77z3n9Rj3b4PS2Cw9rKhaY+k+OPDUnVipzmvs2/T26Fb1P4ZYu/4q+In8vrvnwbb0pP8dY9uXsVDOeJuevLqMsd8PH0IS3jCMVOUv5Nr+kkWPTPinbVnGhnrby0ny8xRTlDvHqu255/ldfZ+7E5nx3z/AFpzxjlzX/h10xFMdpmOmPaY3j3w651Dp3L4Gv8ADyVnOnFvaNWP1U5/iXTt1Ik9OW9fHZexcqNW2vrWotns1OEvZr/GdAa/s7aw1hkbSzoxo0KdRcEI9I7xT5d2aWg19WoqmiunEw5XmTlq3wu3TqLFzqoqnEefaY7xtMbeiCABpuQAAAAAAAAAAAAAAAAAAAAAAAAAABP2urs1Z6fpYWxuPK28HJudJbVJcTb/AFenX02IGUpSk5Sk5Sb3bb3bZgEKbdNEzNMYyvvaq9fimm5VMxTGIz4R6AAJqHNxGVyOIuVc428q21T14Hyl7NdGvyYzORuctk62Qu3B16zTm4rZbpJdOxwwR6KerqxuunUXZtfBmqenOcZ2z54AASUgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/9k=" alt="Builders">
+    <div class="portal-pill">Sales<br>Portal</div>
+  </div>
+
+  <div class="user-chip">
+    <div class="avatar" id="av-initials">TR</div>
+    <div>
+      <div class="u-name" id="u-name-display">Tom Reynolds</div>
+      <div class="u-role" id="u-role-display">Outside Sales</div>
+    </div>
+  </div>
+
+  <!-- Role toggle: Sales / Manager -->
+  <div class="role-toggle">
+    <div class="role-btn active" id="btn-sales" onclick="setRole('sales')">Sales View</div>
+    <div class="role-btn" id="btn-mgr" onclick="setRole('manager')">Manager</div>
+  </div>
+
+  <nav>
+    <div class="nav-sec">Boards</div>
+    <div class="nav-item active" onclick="showPage('projects')" id="nav-projects">
+      <span class="nav-ico">📋</span> My Projects
+      <span class="nav-badge" id="badge-projects">4</span>
+    </div>
+    <div class="nav-item" onclick="showPage('leads')" id="nav-leads">
+      <span class="nav-ico">🎯</span> My Leads
+      <span class="nav-badge">5</span>
+    </div>
+    <div class="nav-item" onclick="showPage('estimating')" id="nav-estimating">
+      <span class="nav-ico">📐</span> Estimating
+      <span class="nav-badge warn" id="badge-est">2</span>
+    </div>
+    <div class="nav-item" onclick="showPage('pipeline')" id="nav-pipeline">
+      <span class="nav-ico">⚡</span> Pipeline
+    </div>
+
+    <div class="nav-sec">Create</div>
+    <div class="nav-item" onclick="showPage('new-project')" id="nav-new-project">
+      <span class="nav-ico">➕</span> New Project
+    </div>
+    <div class="nav-item" onclick="showPage('new-lead')" id="nav-new-lead">
+      <span class="nav-ico">✨</span> New Lead
+    </div>
+
+    <div class="nav-sec">Reports</div>
+    <div class="nav-item" onclick="showPage('dashboard')" id="nav-dashboard">
+      <span class="nav-ico">📊</span> Dashboard
+    </div>
+  </nav>
+
+  <div class="sidebar-foot">
+    <div class="sync-row"><div class="sync-dot"></div>Synced · monday.com</div>
+  </div>
+</aside>
+
+<!-- ════ MAIN ════ -->
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="page-title">My Projects <span id="page-sub"></span></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="bell" onclick="toggleNotif()"><span>🔔</span><div class="bell-pip" id="bell-pip"></div></button>
+      <button class="btn btn-ghost" onclick="showPage('new-project')">+ New Project</button>
+      <button class="btn btn-red" onclick="showPage('new-lead')">+ New Lead</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ════ PROJECTS ════ -->
+    <div class="page active" id="page-projects">
+      <!-- Notification bar -->
+      <div class="notif-bar" id="notif-bar">
+        <div style="font-size:18px">🔔</div>
+        <div class="notif-list">
+          <div class="notif-row"><div class="ndot"></div><strong>Smith Residence</strong> — bid due in 6 days (Mar 15)</div>
+          <div class="notif-row"><div class="ndot y"></div><strong>Riverside Phase 2</strong> — no contact in 22 days, outreach due Apr 1</div>
+          <div class="notif-row"><div class="ndot y"></div><strong>Summit Custom Home</strong> — estimating scope sheet not yet submitted</div>
+        </div>
+        <button class="notif-dismiss" onclick="document.getElementById('notif-bar').style.display='none';document.getElementById('bell-pip').style.display='none'">Dismiss</button>
+      </div>
+
+      <!-- Manager banner -->
+      <div class="mgr-banner" id="mgr-banner">
+        <span>👁 Viewing as:</span>
+        <select onchange="updateViewAs(this.value)">
+          <option>All Reps</option>
+          <option selected>Tom Reynolds</option>
+          <option>Dana Whitmore</option>
+          <option>Chris Patel</option>
+          <option>Sarah Kim</option>
+        </select>
+        <span style="margin-left:6px;color:var(--txt3)">· Manager mode — all edits write back under the rep's identity</span>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="stat-lbl">Active Projects</div><div class="stat-val cb">4</div><div class="stat-sub">2 bids due this month</div></div>
+        <div class="stat"><div class="stat-lbl">Est. Revenue (Loose)</div><div class="stat-val cg">$1.63M</div><div class="stat-sub">open pipeline</div></div>
+        <div class="stat"><div class="stat-lbl">Est. Revenue (Comp.)</div><div class="stat-val cr">$695K</div><div class="stat-sub">open pipeline</div></div>
+        <div class="stat"><div class="stat-lbl">Next Bid Due</div><div class="stat-val cw" style="font-size:20px;padding-top:4px">Mar 15</div><div class="stat-sub soon">⚠ Smith Residence · 6 days</div></div>
+      </div>
+
+      <div class="tbl-wrap">
+        <div class="tbl-head">
+          <div class="tbl-title">CO Pro Projects</div>
+          <input class="srch" placeholder="🔍  Search…" oninput="filterTbl('proj-tbody',this.value)">
+          <select class="fsel" onchange="filterGroup(this.value)">
+            <option value="">All Groups</option>
+            <option>Quoting</option><option>On Hold</option><option>Sold</option><option>Completed</option><option>Dead</option>
+          </select>
+        </div>
+        <table><thead><tr>
+          <th>Project</th><th>Customer</th><th>Segment</th><th>Bid Status</th>
+          <th>Products</th><th>Loose Rev</th><th>Comp Rev</th><th>Next Bid Due</th><th>Scope Sheet</th><th></th>
+        </tr></thead>
+        <tbody id="proj-tbody">
+          <tr class="g-q" onclick="openProject('smith')">
+            <td><div class="nm">Smith Residence – Lot 14</div><div class="sub">Denver · 1 bldg</div></td>
+            <td>ABC Builders LLC<div class="sub">John Smith</div></td>
+            <td><span class="badge b-blue">Custom</span></td>
+            <td><span class="badge b-yellow">Est. Requested</span></td>
+            <td><div class="tags"><span class="tag">Trusses</span><span class="tag">Loose</span></div></td>
+            <td class="money">$450,000</td><td class="money">$180,000</td>
+            <td class="dt soon">Mar 15</td>
+            <td><span class="badge b-red" style="font-size:8px">⚠ Needed</span></td>
+            <td><button class="abtn scope" onclick="event.stopPropagation();openProject('smith','scope')">Scope Sheet</button></td>
+          </tr>
+          <tr class="g-h" onclick="openProject('riverside')">
+            <td><div class="nm">Riverside Phase 2</div><div class="sub">Colorado Springs · 12 bldgs</div></td>
+            <td>XYZ Homes Inc<div class="sub">Jane Doe</div></td>
+            <td><span class="badge b-blue">Production</span></td>
+            <td><span class="badge b-yellow">Est. Sent</span></td>
+            <td><div class="tags"><span class="tag">Full Pkg</span></div></td>
+            <td class="money">$2,800,000</td><td class="money">$1,200,000</td>
+            <td class="dt">—</td>
+            <td><span class="badge b-grey" style="font-size:8px">N/A</span></td>
+            <td><button class="abtn p" onclick="event.stopPropagation();openProject('riverside')">Edit</button></td>
+          </tr>
+          <tr class="g-s" onclick="openProject('summit')">
+            <td><div class="nm">Summit Custom Home</div><div class="sub">Lakewood · 1 bldg · Complex roof</div></td>
+            <td>Summit Framing Co<div class="sub">Mike Johnson</div></td>
+            <td><span class="badge b-blue">Custom</span></td>
+            <td><span class="badge b-green">Sold</span></td>
+            <td><div class="tags"><span class="tag">Trusses</span><span class="tag">Loose</span><span class="tag">EWP</span></div></td>
+            <td class="money">$380,000</td><td class="money">$220,000</td>
+            <td class="dt">—</td>
+            <td><span class="badge b-green" style="font-size:8px">✓ Submitted</span></td>
+            <td><button class="abtn" onclick="event.stopPropagation();openProject('summit')">Edit</button></td>
+          </tr>
+          <tr class="g-d" onclick="openProject('oakpark')">
+            <td><div class="nm">Oak Park Duplex</div><div class="sub">Aurora · 2 bldgs</div></td>
+            <td>Converted Example LLC<div class="sub">Sarah Lee</div></td>
+            <td><span class="badge b-grey">Small Multi</span></td>
+            <td><span class="badge b-green">Sold</span></td>
+            <td><div class="tags"><span class="tag">Trusses</span><span class="tag">Walls</span></div></td>
+            <td class="money">$180,000</td><td class="money">$95,000</td>
+            <td class="dt">—</td>
+            <td><span class="badge b-grey" style="font-size:8px">N/A</span></td>
+            <td><button class="abtn" onclick="event.stopPropagation();openProject('oakpark')">Edit</button></td>
+          </tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <!-- ════ LEADS ════ -->
+    <div class="page" id="page-leads">
+      <div class="stats">
+        <div class="stat"><div class="stat-lbl">Total Leads</div><div class="stat-val cb">5</div><div class="stat-sub">2 hot, 1 warm</div></div>
+        <div class="stat"><div class="stat-lbl">Meetings This Month</div><div class="stat-val cr">3</div><div class="stat-sub">next: Apr 1</div></div>
+        <div class="stat"><div class="stat-lbl">Credit Apps Pending</div><div class="stat-val cy">1</div><div class="stat-sub">Summit Framing</div></div>
+        <div class="stat"><div class="stat-lbl">Converted YTD</div><div class="stat-val cg">1</div><div class="stat-sub">Converted Example LLC</div></div>
+      </div>
+      <div class="tbl-wrap">
+        <div class="tbl-head">
+          <div class="tbl-title">Pro Leads</div>
+          <input class="srch" placeholder="🔍  Search…" oninput="filterTbl('leads-tbody',this.value)">
+          <select class="fsel"><option>All Status</option><option>Hot</option><option>Warm</option><option>Cold</option><option>Converted</option><option>Dead</option></select>
+        </div>
+        <table><thead><tr><th>Company</th><th>Contact</th><th>Segment</th><th>Lead Status</th><th>Relationship</th><th>Next Steps</th><th>Next Meeting</th><th>Source</th><th></th></tr></thead>
+        <tbody id="leads-tbody">
+          <tr onclick="openLead('abc')"><td><div class="nm">ABC Builders LLC</div><div class="sub">Denver, CO</div></td><td>John Smith<div class="sub">555-0101</div></td><td><span class="badge b-blue">Custom</span></td><td><span class="badge b-yellow">Warm</span></td><td><span class="badge b-blue">New</span></td><td>Setup a Meeting</td><td class="dt">Apr 1</td><td>Referral</td><td><button class="abtn p" onclick="event.stopPropagation();openLead('abc')">Edit</button></td></tr>
+          <tr onclick="openLead('xyz')"><td><div class="nm">XYZ Homes Inc</div><div class="sub">Colorado Springs, CO</div></td><td>Jane Doe<div class="sub">555-0102</div></td><td><span class="badge b-blue">Production</span></td><td><span class="badge b-red">Hot</span></td><td><span class="badge b-green">Active</span></td><td>Prospect Mkt Review</td><td class="dt">—</td><td>Cold Call</td><td><button class="abtn" onclick="event.stopPropagation();openLead('xyz')">Edit</button></td></tr>
+          <tr onclick="openLead('summit')"><td><div class="nm">Summit Framing Co</div><div class="sub">Lakewood, CO</div></td><td>Mike Johnson<div class="sub">555-0103</div></td><td><span class="badge b-blue">Custom</span></td><td><span class="badge b-red">Hot</span></td><td><span class="badge b-green">Active</span></td><td>Credit App</td><td class="dt">—</td><td>Website</td><td><button class="abtn" onclick="event.stopPropagation();openLead('summit')">Edit</button></td></tr>
+          <tr onclick="openLead('conv')"><td><div class="nm">Converted Example LLC</div><div class="sub">Aurora, CO</div></td><td>Sarah Lee<div class="sub">555-0104</div></td><td><span class="badge b-grey">Small Multi</span></td><td><span class="badge b-purple">Existing</span></td><td><span class="badge b-green">Active</span></td><td>Potential Quote</td><td class="dt">—</td><td>Existing Customer</td><td><button class="abtn" onclick="event.stopPropagation();openLead('conv')">Edit</button></td></tr>
+          <tr onclick="openLead('dead')" style="opacity:.55"><td><div class="nm">Dead Lead Corp</div><div class="sub">Boulder, CO</div></td><td>Bob Wilson<div class="sub">555-0105</div></td><td><span class="badge b-grey">Remodel</span></td><td><span class="badge b-grey">Cold</span></td><td><span class="badge b-red">Lost</span></td><td>Dead</td><td class="dt">—</td><td>Trade Show</td><td><button class="abtn" onclick="event.stopPropagation();openLead('dead')">Edit</button></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <!-- ════ ESTIMATING ════ -->
+    <div class="page" id="page-estimating">
+      <div class="stats">
+        <div class="stat"><div class="stat-lbl">Incoming / Unassigned</div><div class="stat-val cr">2</div><div class="stat-sub">awaiting estimator</div></div>
+        <div class="stat"><div class="stat-lbl">In Progress</div><div class="stat-val cy">1</div><div class="stat-sub">takeoff underway</div></div>
+        <div class="stat"><div class="stat-lbl">Waiting on Info</div><div class="stat-val cb">1</div><div class="stat-sub">scope incomplete</div></div>
+        <div class="stat"><div class="stat-lbl">Completed This Month</div><div class="stat-val cg">3</div><div class="stat-sub">sent to sales</div></div>
+      </div>
+      <div class="tbl-wrap">
+        <div class="tbl-head">
+          <div class="tbl-title">Loose Lumber Estimating</div>
+          <input class="srch" placeholder="🔍  Search…" oninput="filterTbl('est-tbody',this.value)">
+          <select class="fsel">
+            <option>All Status</option>
+            <option>Incoming / Not Assigned</option>
+            <option>Assigned / Not Started</option>
+            <option>Takeoff in Process</option>
+            <option>Waiting on Information</option>
+            <option>Completed &amp; Sent</option>
+          </select>
+          <select class="fsel">
+            <option>All Estimators</option>
+            <option>Tom Reynolds</option>
+            <option>Dana Whitmore</option>
+          </select>
+        </div>
+        <table><thead><tr>
+          <th>Project / Builder</th><th>Request Type</th><th>Priority</th><th>Takeoff Status</th>
+          <th>Assigned Estimator</th><th>Submittal Date</th><th>Bid Due</th><th>Scope Complete?</th><th></th>
+        </tr></thead>
+        <tbody id="est-tbody">
+          <tr onclick="openEstimating('smith')">
+            <td><div class="nm">Smith Residence – Lot 14</div><div class="sub">ABC Builders LLC · Denver</div></td>
+            <td><span class="badge b-blue">New Estimate</span></td>
+            <td class="pri-high">High</td>
+            <td><span class="est-status es-incoming">● Incoming</span></td>
+            <td class="dt" style="color:var(--red)">Unassigned</td>
+            <td class="dt">Feb 25, 2026</td>
+            <td class="dt soon">Mar 15</td>
+            <td><span class="badge b-red">⚠ Incomplete</span></td>
+            <td><button class="abtn scope" onclick="event.stopPropagation();openEstimating('smith')">View Scope</button></td>
+          </tr>
+          <tr onclick="openEstimating('riverside')">
+            <td><div class="nm">Riverside Phase 2</div><div class="sub">XYZ Homes Inc · Colorado Springs</div></td>
+            <td><span class="badge b-yellow">Update Existing</span></td>
+            <td class="pri-med">Medium</td>
+            <td><span class="est-status es-assigned">● Assigned</span></td>
+            <td>Dana Whitmore</td>
+            <td class="dt">Mar 1, 2026</td>
+            <td class="dt">—</td>
+            <td><span class="badge b-green">✓ Complete</span></td>
+            <td><button class="abtn p" onclick="event.stopPropagation();openEstimating('riverside')">Edit</button></td>
+          </tr>
+          <tr onclick="openEstimating('summit')">
+            <td><div class="nm">Summit Custom Home</div><div class="sub">Summit Framing Co · Lakewood</div></td>
+            <td><span class="badge b-blue">New Estimate</span></td>
+            <td class="pri-high">High</td>
+            <td><span class="est-status es-inprog">● In Progress</span></td>
+            <td>Dana Whitmore</td>
+            <td class="dt">Jan 20, 2026</td>
+            <td class="dt">Mar 15</td>
+            <td><span class="badge b-green">✓ Complete</span></td>
+            <td><button class="abtn" onclick="event.stopPropagation();openEstimating('summit')">Edit</button></td>
+          </tr>
+          <tr onclick="openEstimating('oakpark')">
+            <td><div class="nm">Oak Park Duplex</div><div class="sub">Converted Example LLC · Aurora</div></td>
+            <td><span class="badge b-grey">Recheck / Re-price</span></td>
+            <td class="pri-low">Low</td>
+            <td><span class="est-status es-waiting">● Waiting on Info</span></td>
+            <td>Tom Reynolds</td>
+            <td class="dt">Feb 10, 2026</td>
+            <td class="dt">—</td>
+            <td><span class="badge b-red">⚠ Incomplete</span></td>
+            <td><button class="abtn scope" onclick="event.stopPropagation();openEstimating('oakpark')">View Scope</button></td>
+          </tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <!-- ════ PIPELINE ════ -->
+    <div class="page" id="page-pipeline">
+      <div class="pipe-wrap">
+        <div class="pc">
+          <div class="pc-head" style="color:var(--blue)">Quoting <span class="pc-cnt">2</span></div>
+          <div class="pc-cards">
+            <div class="pcard" onclick="openProject('smith')"><div class="pcard-name">Smith Residence – Lot 14</div><div class="pcard-cust">ABC Builders LLC</div><div class="pcard-val">$630K est.</div><div class="pcard-tags"><span class="pcard-tag">Trusses</span><span class="pcard-tag">Loose</span></div><div class="pcard-dt soon">⚠ Bid Mar 15</div></div>
+            <div class="pcard" onclick="openProject('riverside')"><div class="pcard-name">Riverside Phase 2</div><div class="pcard-cust">XYZ Homes Inc</div><div class="pcard-val">$4.0M est.</div><div class="pcard-tags"><span class="pcard-tag">Full Pkg</span><span class="pcard-tag">12 bldgs</span></div><div class="pcard-dt" style="color:var(--yellow)">ON HOLD</div></div>
+          </div>
+        </div>
+        <div class="pc"><div class="pc-head" style="color:var(--yellow)">On Hold <span class="pc-cnt">0</span></div><div class="pc-cards"><div class="pe">No items</div></div></div>
+        <div class="pc">
+          <div class="pc-head" style="color:var(--green)">Sold <span class="pc-cnt">1</span></div>
+          <div class="pc-cards">
+            <div class="pcard" onclick="openProject('summit')"><div class="pcard-name">Summit Custom Home</div><div class="pcard-cust">Summit Framing Co</div><div class="pcard-val">$600K contracted</div><div class="pcard-tags"><span class="pcard-tag">Trusses</span><span class="pcard-tag">EWP</span><span class="pcard-tag">Loose</span></div><div class="pcard-dt">Start Apr 2025</div></div>
+          </div>
+        </div>
+        <div class="pc">
+          <div class="pc-head" style="color:var(--txt3)">Completed <span class="pc-cnt">1</span></div>
+          <div class="pc-cards">
+            <div class="pcard" onclick="openProject('oakpark')" style="opacity:.6"><div class="pcard-name">Oak Park Duplex</div><div class="pcard-cust">Converted Example LLC</div><div class="pcard-val">$275K delivered</div><div class="pcard-dt">Done Dec 2024</div></div>
+          </div>
+        </div>
+        <div class="pc">
+          <div class="pc-head" style="color:var(--red)">Dead <span class="pc-cnt">1</span></div>
+          <div class="pc-cards">
+            <div class="pcard" style="opacity:.4"><div class="pcard-name">Failed Commercial</div><div class="pcard-cust">Dead Lead Corp</div><div class="pcard-val" style="color:var(--red)">Lost on price</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ DASHBOARD ════ -->
+    <div class="page" id="page-dashboard">
+      <div class="dash-note">
+        <div style="font-size:22px;flex-shrink:0">📊</div>
+        <div>Live <strong style="color:var(--txt)">monday.com dashboards</strong> embed here via iframe once connected — your existing charts, KPIs, and workload widgets appear exactly as in Monday. The panels below simulate your rep-level data view.</div>
+      </div>
+      <div class="dash-grid">
+        <div class="dc"><div class="dc-title">Revenue by Market Segment (Est.)</div>
+          <div class="bar-row"><div class="bar-lbl">Production</div><div class="bar-trk"><div class="bar-fill" style="width:85%"></div></div><div class="bar-val">$4.0M</div></div>
+          <div class="bar-row"><div class="bar-lbl">Custom Builder</div><div class="bar-trk"><div class="bar-fill b" style="width:44%"></div></div><div class="bar-val">$1.03M</div></div>
+          <div class="bar-row"><div class="bar-lbl">Small Multi</div><div class="bar-trk"><div class="bar-fill g" style="width:12%"></div></div><div class="bar-val">$275K</div></div>
+          <div class="bar-row"><div class="bar-lbl">Small Comm.</div><div class="bar-trk"><div class="bar-fill gr" style="width:4%"></div></div><div class="bar-val">—</div></div>
+        </div>
+        <div class="dc"><div class="dc-title">Bid Pipeline Funnel</div>
+          <div class="fn-step"><div class="fn-bar" style="width:100%;background:var(--blue)">Est. Requested</div><div class="fn-lbl">1</div></div>
+          <div class="fn-step"><div class="fn-bar" style="width:75%;background:#2563eb">Est. Sent</div><div class="fn-lbl">1</div></div>
+          <div class="fn-step"><div class="fn-bar" style="width:40%;background:var(--green)">Sold</div><div class="fn-lbl">2</div></div>
+          <div class="fn-step"><div class="fn-bar" style="width:15%;background:var(--red)">Lost</div><div class="fn-lbl">1</div></div>
+        </div>
+        <div class="dc"><div class="dc-title">Projects by Stage</div>
+          <div class="donut-wrap">
+            <div class="donut"><svg width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="48" r="36" fill="none" stroke="#1c1c1c" stroke-width="17"/><circle cx="48" cy="48" r="36" fill="none" stroke="#3b82f6" stroke-width="17" stroke-dasharray="57 169" stroke-dashoffset="0"/><circle cx="48" cy="48" r="36" fill="none" stroke="#22c55e" stroke-width="17" stroke-dasharray="34 169" stroke-dashoffset="-57"/><circle cx="48" cy="48" r="36" fill="none" stroke="#585858" stroke-width="17" stroke-dasharray="23 169" stroke-dashoffset="-91"/><circle cx="48" cy="48" r="36" fill="none" stroke="#E53427" stroke-width="17" stroke-dasharray="11 169" stroke-dashoffset="-114"/></svg><div class="donut-mid"><div class="big">5</div><div class="sm">total</div></div></div>
+            <div class="legend"><div class="li"><div class="ld" style="background:var(--blue)"></div>Quoting (2)</div><div class="li"><div class="ld" style="background:var(--green)"></div>Sold (1)</div><div class="li"><div class="ld" style="background:var(--txt3)"></div>Completed (1)</div><div class="li"><div class="ld" style="background:var(--red)"></div>Dead (1)</div></div>
+          </div>
+        </div>
+        <div class="dc"><div class="dc-title">Recent Activity</div>
+          <div class="tl-item"><div class="tl-dot"></div><div><div class="tl-tx">Scope sheet submitted — <strong>Smith Residence</strong></div><div class="tl-dt">Mar 9, 2026</div></div></div>
+          <div class="tl-item"><div class="tl-dot b"></div><div><div class="tl-tx">Bid updated — <strong>Riverside Phase 2</strong></div><div class="tl-dt">Mar 1, 2026</div></div></div>
+          <div class="tl-item"><div class="tl-dot g"></div><div><div class="tl-tx">Contract approved — <strong>Summit Framing Co</strong></div><div class="tl-dt">Jan 15, 2026</div></div></div>
+          <div class="tl-item"><div class="tl-dot gr"></div><div><div class="tl-tx">Takeoff completed — <strong>Summit Custom Home</strong></div><div class="tl-dt">Feb 20, 2026</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ NEW PROJECT ════ -->
+    <div class="page" id="page-new-project">
+      <div class="fw">
+        <div class="fi-title" style="margin-bottom:4px">New Project Request</div>
+        <div class="fi-sub" style="margin-bottom:18px">Creates a new item on the <strong>CO Pro Projects</strong> board · monday.com</div>
+
+        <!-- Section 1: Identity -->
+        <div class="fcard">
+          <div class="fcard-head"><div class="fcard-num">1</div><div class="fcard-title">Identity &amp; Assignment</div></div>
+          <div class="fcard-body">
+            <div class="fgrid">
+              <div class="fgroup s2"><label>Project Name *</label><input type="text" placeholder="e.g. Smith Residence – Lot 14"></div>
+              <div class="fgroup"><label>Customer Name *</label><select><option>— Select from Leads —</option><option>ABC Builders LLC</option><option>XYZ Homes Inc</option><option>Summit Framing Co</option><option>Converted Example LLC</option></select></div>
+              <div class="fgroup"><label>Market Segment</label><select><option>— Select —</option><option>Custom Builder</option><option>Production Builder</option><option>Small Multifamily</option><option>Large Multifamily</option><option>Small Commercial</option><option>Large Commercial</option><option>Remodel</option></select></div>
+              <div class="fgroup"><label>Outside Sales</label><select><option>Tom Reynolds</option><option>Dana Whitmore</option><option>Chris Patel</option></select></div>
+              <div class="fgroup"><label>Builders Facility</label><select><option>Colorado-Aurora</option><option>Colorado-Springs</option><option>Colorado-Boulder</option></select></div>
+              <div class="fgroup"><label>Subdivision Name</label><input type="text" placeholder="If applicable"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Project Details -->
+        <div class="fcard">
+          <div class="fcard-head"><div class="fcard-num">2</div><div class="fcard-title">Project Details &amp; Scope</div></div>
+          <div class="fcard-body">
+            <div class="fgrid">
+              <div class="fgroup"><label>Project Address</label><input type="text" placeholder="Street address"></div>
+              <div class="fgroup"><label>City</label><input type="text"></div>
+              <div class="fgroup"><label>State</label><input type="text" value="CO"></div>
+              <div class="fgroup"><label>Number of Buildings</label><input type="number" value="1" min="1"></div>
+              <div class="fgroup"><label>Project SQFT</label><input type="number" placeholder="e.g. 2800"></div>
+              <div class="fgroup"><label>Type of Estimate</label><select><option>New Estimate</option><option>Update Existing Estimate</option><option>Design Build</option></select></div>
+              <div class="fgroup"><label>Project Plan Status</label><select><option>Bid Plans</option><option>Pre-Conceptual</option><option>Design Development</option><option>Construction Plans</option></select></div>
+              <div class="fgroup s2">
+                <label>Products / Services Needed * <span style="color:var(--yellow);font-size:9px;letter-spacing:.04em;text-transform:none;font-family:'Barlow',sans-serif">&nbsp;— selecting Loose Lumber triggers scope sheet below</span></label>
+                <div class="multi-wrap" id="products-wrap">
+                  <span class="mtag off" onclick="toggleProd(this,'Trusses/Components')">Trusses/Components</span>
+                  <span class="mtag off" onclick="toggleProd(this,'Loose Lumber')">Loose Lumber</span>
+                  <span class="mtag off" onclick="toggleProd(this,'EWP/Floors')">EWP/Floors</span>
+                  <span class="mtag off" onclick="toggleProd(this,'Walls')">Walls</span>
+                  <span class="mtag off" onclick="toggleProd(this,'Roof Trusses')">Roof Trusses</span>
+                  <span class="mtag off" onclick="toggleProd(this,'Siding')">Siding</span>
+                  <span class="mtag off" onclick="toggleProd(this,'Windows &amp; Doors')">Windows &amp; Doors</span>
+                  <span class="mtag off" onclick="toggleProd(this,'Full Package')">Full Package</span>
+                </div>
+              </div>
+              <div class="fgroup s2"><label>Other Project Details</label><textarea placeholder="Notes, special considerations, roof complexity…"></textarea></div>
+              <div class="fgroup s2"><label>File Location (Plans)</label><input type="text" placeholder="\\server\plans\..."></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ★ SCOPE SHEET — auto-triggered ★ -->
+        <div class="scope-card" id="scope-card">
+          <div class="scope-card-head">
+            <div class="fcard-num" style="background:var(--yellow);color:#000">S</div>
+            <div class="fcard-title">Loose Lumber Scope Sheet</div>
+            <div class="scope-card-badge">Auto-triggered · Required for Estimating</div>
+          </div>
+          <div class="scope-intro">
+            <span style="color:var(--yellow);font-size:14px">ℹ</span>
+            Fields marked with a project icon are <strong style="color:var(--txt2)">pre-filled from above</strong> and read-only here. Complete only the fields below that are specific to this scope.
+          </div>
+          <div class="fcard-body">
+
+            <!-- Pre-filled read-only summary -->
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;padding:12px 14px;background:var(--bg);border-radius:7px;border:1px solid var(--brd)">
+              <div><div style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);margin-bottom:3px">Project</div><div style="font-size:12px;font-weight:700;color:var(--txt2)" id="ss-project">—</div></div>
+              <div><div style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);margin-bottom:3px">Customer</div><div style="font-size:12px;font-weight:700;color:var(--txt2)" id="ss-customer">—</div></div>
+              <div><div style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);margin-bottom:3px">Facility</div><div style="font-size:12px;font-weight:700;color:var(--txt2)" id="ss-facility">—</div></div>
+              <div><div style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);margin-bottom:3px">Bid Due</div><div style="font-size:12px;font-weight:700;color:var(--txt2)" id="ss-biddue">—</div></div>
+            </div>
+
+            <!-- Estimating meta -->
+            <div class="scope-sec">Estimating Request</div>
+            <div class="fgrid" style="margin-bottom:20px">
+              <div class="fgroup"><label>Request Type</label><select><option>New Estimate Request</option><option>Revision / Update</option><option>Design Build</option><option>Recheck / Re-price</option><option>Value Engineering</option></select></div>
+              <div class="fgroup"><label>Takeoff Type</label><select><option>— Select —</option><option>Full Takeoff</option><option>Partial Takeoff</option><option>Rough Order of Magnitude</option></select></div>
+              <div class="fgroup"><label>Priority</label><select><option>Medium</option><option>High</option><option>Low</option></select></div>
+              <div class="fgroup"><label>Submittal Date</label><input type="date"></div>
+              <div class="fgroup s2"><label>Customer Provided Material Lists?</label><div class="cbrow"><input type="checkbox" id="cust-ml"><label class="cblbl" for="cust-ml">Yes — customer has provided their own material lists</label></div></div>
+            </div>
+
+            <!-- Framing -->
+            <div class="scope-sec">Framing Specifications</div>
+            <div class="fgrid" style="margin-bottom:20px">
+              <div class="fgroup"><label>Wall Framing Type</label><select><option>— Select —</option><option>2x4 Standard</option><option>2x6 Standard</option><option>Other</option></select></div>
+              <div class="fgroup"><label>Floor Framing Type</label><select><option>— Select —</option><option>TJI / I-Joist</option><option>Dimensional Lumber</option><option>Open Web Truss</option><option>Other</option></select></div>
+              <div class="fgroup"><label>Roof Framing Type</label><select><option>— Select —</option><option>Pre-engineered Trusses</option><option>Stick Frame / Rafter</option><option>Other</option></select></div>
+              <div class="fgroup"><label>Post/Beam Frame Spec</label><input type="text" placeholder="Spec or N/A"></div>
+              <div class="fgroup"><label>Interior Stair Framing Type</label><input type="text" placeholder="e.g. Open riser, Closed stringer…"></div>
+              <div class="fgroup"><label>EWP Brand</label><input type="text" placeholder="e.g. Weyerhaeuser, LP, Boise Cascade"></div>
+              <div class="fgroup"><label>Wall Sheathing</label><select><option>— Select —</option><option>OSB 7/16"</option><option>OSB 1/2"</option><option>Plywood 1/2"</option><option>Plywood 5/8"</option><option>ZIP System</option><option>Fiberboard</option><option>No Sheathing</option><option>Other</option></select></div>
+              <div class="fgroup"><label>Roof Sheathing</label><select><option>— Select —</option><option>OSB 7/16"</option><option>OSB 1/2"</option><option>Plywood 1/2"</option><option>Plywood 5/8"</option><option>ZIP System Roof</option><option>Structural 1</option><option>Other</option></select></div>
+              <div class="fgroup"><label>House Wrap</label><input type="text" placeholder="e.g. Tyvek HomeWrap, ZIP, Felt 15#"></div>
+            </div>
+
+            <!-- Exterior / Siding -->
+            <div class="scope-sec">Exterior &amp; Siding</div>
+            <div class="fgrid" style="margin-bottom:20px">
+              <div class="fgroup"><label>Trim Brand</label><input type="text" placeholder="e.g. Kleer, Versatex, Azek"></div>
+              <div class="fgroup"><label>Trim Thickness</label><input type="text" placeholder='e.g. 3/4", 1"'></div>
+              <div class="fgroup"><label>Soffit/Fascia Brand</label><input type="text" placeholder="Brand or spec"></div>
+              <div class="fgroup"><label>Fascia Thickness</label><input type="text" placeholder='e.g. 3/4"'></div>
+              <div class="fgroup"><label>Soffit Type</label><input type="text" placeholder="e.g. Vented, Solid, Aluminum"></div>
+              <div class="fgroup"><label>Lap Siding Brand</label><input type="text" placeholder="e.g. James Hardie, LP SmartSide"></div>
+              <div class="fgroup"><label>Vertical Siding Brand/Spec</label><input type="text" placeholder="Brand or spec or N/A"></div>
+              <div class="fgroup"><label>Board &amp; Batten Spec</label><input type="text" placeholder="Spec or N/A"></div>
+              <div class="fgroup s2"><label>Exterior Trim Notes</label><textarea placeholder="Any additional exterior trim details, custom specs, or special considerations…"></textarea></div>
+            </div>
+
+            <!-- Decking -->
+            <div class="scope-sec">Decking</div>
+            <div class="fgrid" style="margin-bottom:4px">
+              <div class="fgroup"><label>Decking Material</label><input type="text" placeholder="e.g. Trex, PT Lumber, Cedar, Composite"></div>
+              <div class="fgroup"><label>Deck Fascia/Trim</label><input type="text" placeholder="Brand or spec"></div>
+              <div class="fgroup"><label>Deck Railing</label><input type="text" placeholder="e.g. Cable rail, Aluminum, Wood"></div>
+              <div class="fgroup s2"><label>Decking Notes</label><textarea placeholder="Deck size, levels, special features, attached/detached…"></textarea></div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Section 3: Dates & Pricing -->
+        <div class="fcard">
+          <div class="fcard-head"><div class="fcard-num">3</div><div class="fcard-title">Dates &amp; Pricing</div></div>
+          <div class="fcard-body">
+            <div class="fgrid">
+              <div class="fgroup"><label>Date Requested</label><input type="date"></div>
+              <div class="fgroup"><label>Next Bid Due Date</label><input type="date" id="np-biddue" oninput="updateScopePreview()"></div>
+              <div class="fgroup"><label>Projected Start Date</label><input type="date"></div>
+              <div class="fgroup"><label>Estimated Completion</label><input type="date"></div>
+              <div class="fgroup"><label>Pricing Method</label><select><option>Cash/Inventory</option><option>Futures</option><option>Market Prices</option></select></div>
+              <div class="fgroup"><label>Loose Revenue (Est.)</label><input type="number" placeholder="$0"></div>
+              <div class="fgroup"><label>Loose GM % (Est.)</label><input type="number" placeholder="0%"></div>
+              <div class="fgroup"><label>Component Revenue (Est.)</label><input type="number" placeholder="$0"></div>
+              <div class="fgroup s2"><label>Pricing Strategy / Considerations</label><textarea placeholder="e.g. Priced to win — first project with this builder"></textarea></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: Outreach -->
+        <div class="fcard">
+          <div class="fcard-head"><div class="fcard-num">4</div><div class="fcard-title">Outreach &amp; Next Steps</div></div>
+          <div class="fcard-body">
+            <div class="fgrid">
+              <div class="fgroup"><label>Last Contact</label><input type="date"></div>
+              <div class="fgroup"><label>Next Outreach</label><input type="date"></div>
+              <div class="fgroup"><label>Next Meeting Type</label><select><option>Phone Call</option><option>Site Visit</option><option>Office Meeting</option><option>Teams/Zoom</option><option>Email Follow-up</option><option>Lunch/Dinner Meeting</option></select></div>
+              <div class="fgroup"><div class="cbrow"><input type="checkbox" id="mitek"><label class="cblbl" for="mitek">Mitek Insurance Cert Required</label></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-red" onclick="submitNewProject()" style="padding:10px 24px;font-size:14px">✓ Submit to monday.com</button>
+          <button class="btn btn-ghost" onclick="showPage('projects')" style="padding:10px 17px">Cancel</button>
+          <div class="save-ok" id="np-ok">✓ Saved to monday.com</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ NEW LEAD ════ -->
+    <div class="page" id="page-new-lead">
+      <div class="fw">
+        <div class="fi-title" style="margin-bottom:4px">New Lead</div>
+        <div class="fi-sub" style="margin-bottom:18px">Creates a new item on the <strong>Pro Leads</strong> board · monday.com</div>
+        <div class="fcard">
+          <div class="fcard-head"><div class="fcard-num">1</div><div class="fcard-title">Company &amp; Contact</div></div>
+          <div class="fcard-body">
+            <div class="fgrid">
+              <div class="fgroup s2"><label>Company Name *</label><input type="text" placeholder="Legal company name"></div>
+              <div class="fgroup"><label>Customer Contact</label><input type="text" placeholder="Primary contact name"></div>
+              <div class="fgroup"><label>Customer Phone</label><input type="tel" placeholder="555-0100"></div>
+              <div class="fgroup"><label>Customer Email</label><input type="email" placeholder="contact@company.com"></div>
+              <div class="fgroup"><label>Market Segment</label><select><option>— Select —</option><option>Custom Builder</option><option>Production Builder</option><option>Small Multifamily</option><option>Large Multifamily</option><option>Small Commercial</option><option>Large Commercial</option><option>Remodel</option></select></div>
+              <div class="fgroup"><label>Customer Address</label><input type="text"></div>
+              <div class="fgroup"><label>City</label><input type="text"></div>
+              <div class="fgroup"><label>State</label><input type="text" value="CO"></div>
+            </div>
+          </div>
+        </div>
+        <div class="fcard">
+          <div class="fcard-head"><div class="fcard-num">2</div><div class="fcard-title">Qualification</div></div>
+          <div class="fcard-body">
+            <div class="fgrid">
+              <div class="fgroup"><label>Lead Status</label><select><option>Warm</option><option>Hot</option><option>Cold</option><option>Do Not Call</option><option>Get Back Customer</option><option>Existing Customer</option><option>Convert to Prospect</option></select></div>
+              <div class="fgroup"><label>Lead Source</label><select><option>Referral</option><option>Cold Call</option><option>Trade Show</option><option>Website</option><option>Existing Customer</option><option>Walk In</option></select></div>
+              <div class="fgroup"><label>Relationship Status</label><select><option>New</option><option>Active</option><option>Dormant</option><option>At Risk</option><option>Lost</option></select></div>
+              <div class="fgroup"><label>Next Steps</label><select><option>Setup a Meeting</option><option>Prospect Market Review</option><option>Credit App</option><option>Stuck</option><option>Dead</option><option>Dead for Now</option><option>Potential Quote</option><option>New Customer</option></select></div>
+              <div class="fgroup"><label>Outside Sales</label><select><option>Tom Reynolds</option><option>Dana Whitmore</option><option>Chris Patel</option></select></div>
+              <div class="fgroup s2"><label>Current Builders Relationship?</label><textarea placeholder="Describe the existing relationship…"></textarea></div>
+            </div>
+          </div>
+        </div>
+        <div class="fcard">
+          <div class="fcard-head"><div class="fcard-num">3</div><div class="fcard-title">Outreach Timeline</div></div>
+          <div class="fcard-body">
+            <div class="fgrid">
+              <div class="fgroup"><label>Initial Outreach Date</label><input type="date"></div>
+              <div class="fgroup"><label>Next Meeting Date</label><input type="date"></div>
+              <div class="fgroup"><label>Next Meeting Type</label><select><option>Phone Call</option><option>Site Visit</option><option>Office Meeting</option><option>Teams/Zoom</option><option>Email Follow-up</option></select></div>
+              <div class="fgroup s2"><label>Notes</label><textarea placeholder="Additional context, background…"></textarea></div>
+            </div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-red" style="padding:10px 24px;font-size:14px">✓ Submit to monday.com</button>
+          <button class="btn btn-ghost" onclick="showPage('leads')" style="padding:10px 17px">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</main>
+
+<!-- ════ PROJECT SLIDE-OVER ════ -->
+<div class="overlay" id="ov-project" onclick="closeOv('ov-project')">
+  <div class="slideover" onclick="event.stopPropagation()">
+    <div class="so-head">
+      <div style="flex:1">
+        <div class="so-title" id="so-proj-title">Smith Residence – Lot 14</div>
+        <div class="so-bdgs"><span class="badge b-blue" id="so-proj-group">Quoting</span><span class="badge b-yellow">Est. Requested</span></div>
+      </div>
+      <button class="x-btn" onclick="closeOv('ov-project')">×</button>
+    </div>
+    <div class="so-qi">
+      <div class="qi">📍 <strong>Denver, CO</strong></div>
+      <div class="qi">👤 <strong>John Smith</strong></div>
+      <div class="qi">📞 <strong>555-0201</strong></div>
+      <div class="qi">✉️ <strong>john@abcbuilders.com</strong></div>
+    </div>
+    <div class="so-tabs">
+      <div class="so-tab active" onclick="soTab(this,'sot-details')">Details</div>
+      <div class="so-tab" onclick="soTab(this,'sot-estimating')">Estimating</div>
+      <div class="so-tab" onclick="soTab(this,'sot-financials')">Financials</div>
+      <div class="so-tab" onclick="soTab(this,'sot-outreach')">Outreach</div>
+      <div class="so-tab scope-tab" id="scope-tab-btn" onclick="soTab(this,'sot-scope')">📐 Scope Sheet</div>
+    </div>
+    <div class="so-body">
+      <!-- Details -->
+      <div class="so-tc active" id="sot-details">
+        <div class="fgrid">
+          <div class="fgroup s2"><label>Project Name</label><input type="text" value="Smith Residence – Lot 14"></div>
+          <div class="fgroup"><label>Customer Name</label><select><option>ABC Builders LLC</option><option>XYZ Homes Inc</option></select></div>
+          <div class="fgroup"><label>Market Segment</label><select><option>Custom Builder</option><option>Production Builder</option></select></div>
+          <div class="fgroup"><label>Builders Facility</label><select><option>Colorado-Aurora</option><option>Colorado-Springs</option></select></div>
+          <div class="fgroup"><label>Subdivision Name</label><input type="text" placeholder="—"></div>
+          <div class="fgroup"><label>Project Address</label><input type="text" value="1234 Maple Dr"></div>
+          <div class="fgroup"><label>City / State</label><input type="text" value="Denver, CO"></div>
+          <div class="fgroup"><label>Number of Buildings</label><input type="number" value="1"></div>
+          <div class="fgroup"><label>Project SQFT</label><input type="number" placeholder="2800"></div>
+          <div class="fgroup"><label>Type of Estimate</label><select><option>New Estimate</option><option>Update Existing</option></select></div>
+          <div class="fgroup"><label>Plan Status</label><select><option>Bid Plans</option><option>Construction Plans</option></select></div>
+          <div class="fgroup s2"><label>Products / Services Needed</label><div class="multi-wrap"><span class="mtag" onclick="toggleTag(this)">Trusses/Components</span><span class="mtag" onclick="toggleTag(this)">Loose Lumber</span><span class="mtag off" onclick="toggleTag(this)">EWP/Floors</span><span class="mtag off" onclick="toggleTag(this)">Walls</span><span class="mtag off" onclick="toggleTag(this)">Siding</span><span class="mtag off" onclick="toggleTag(this)">Full Package</span></div></div>
+          <div class="fgroup s2"><label>Other Project Details</label><textarea>Single family, 2800 sqft, 2-story</textarea></div>
+          <div class="fgroup s2"><label>File Location (Plans)</label><input type="text" value="\\server\plans\abc_smith_lot14"></div>
+          <div class="fgroup"><label>Bid Status</label><select><option>Estimate Requested</option><option>Invitation</option><option>Estimate Sent</option><option>Lost</option><option>Sold</option></select></div>
+          <div class="fgroup"><label>EMT Approval Status</label><select><option>Not Required</option><option>Required</option><option>Approved</option></select></div>
+        </div>
+      </div>
+      <!-- Estimating -->
+      <div class="so-tc" id="sot-estimating">
+        <div class="fgrid">
+          <div class="fgroup"><label>Component Estimator</label><select><option>— Unassigned —</option><option>Tom Reynolds</option><option>Dana Whitmore</option></select></div>
+          <div class="fgroup"><label>Component Estimate Status</label><select><option>Not Started</option><option>In Progress</option><option>Complete</option><option>On Hold</option></select></div>
+          <div class="fgroup"><label>Loose Estimator</label><select><option>— Unassigned —</option><option>Tom Reynolds</option><option>Dana Whitmore</option></select></div>
+          <div class="fgroup"><label>Loose Estimating Status</label><select><option>Not Started</option><option>In Progress</option><option>Complete</option></select></div>
+          <div class="fgroup"><label>Date Requested</label><input type="date" value="2025-03-01"></div>
+          <div class="fgroup"><label>Next Bid Due Date</label><input type="date" value="2025-03-15"></div>
+          <div class="fgroup"><label>Projected Start Date</label><input type="date" value="2025-06-01"></div>
+          <div class="fgroup"><label>Est. Completion</label><input type="date" value="2025-12-01"></div>
+        </div>
+      </div>
+      <!-- Financials -->
+      <div class="so-tc" id="sot-financials">
+        <div class="fgrid">
+          <div class="fgroup"><label>Pricing Method</label><select><option>Cash/Inventory</option><option>Futures</option><option>Market Prices</option></select></div>
+          <div class="fgroup"><label>Repricing Interval</label><select><option>— N/A —</option><option>Monthly</option><option>Quarterly</option><option>Per Phase</option></select></div>
+          <div class="fgroup"><label>Loose Revenue (Est.)</label><input type="number" value="450000"></div>
+          <div class="fgroup"><label>Loose GM % (Est.)</label><input type="number" value="22"></div>
+          <div class="fgroup"><label>Component Revenue (Est.)</label><input type="number" value="180000"></div>
+          <div class="fgroup"><label>Component GM % (Est.)</label><input type="number" value="25"></div>
+          <div class="fgroup s2"><label>Pricing Strategy</label><textarea>Standard pricing</textarea></div>
+          <div class="fgroup"><label>Contract Status</label><select><option>In Discussion</option><option>Draft in Process</option><option>Approved</option></select></div>
+          <div class="fgroup"><label>Contract Date</label><input type="date"></div>
+        </div>
+      </div>
+      <!-- Outreach -->
+      <div class="so-tc" id="sot-outreach">
+        <div class="fgrid">
+          <div class="fgroup"><label>Last Contact</label><input type="date" value="2025-03-01"></div>
+          <div class="fgroup"><label>Next Outreach</label><input type="date" value="2025-03-10"></div>
+          <div class="fgroup"><label>Next Meeting Type</label><select><option>Phone Call</option><option>Site Visit</option><option>Teams/Zoom</option></select></div>
+          <div class="fgroup"><label>Material Status</label><select><option>Not Started</option><option>PO Issued</option><option>Partially Received</option><option>Fully Received</option></select></div>
+          <div class="fgroup s2"><label>Procurement Considerations</label><textarea placeholder="e.g. Buy trusses early — 8 week lead time"></textarea></div>
+        </div>
+      </div>
+      <!-- Scope Sheet tab (edit existing) -->
+      <div class="so-tc" id="sot-scope">
+        <div class="scope-tab-notice">📐 This scope sheet was submitted with the original project request. Edit and save to update the Loose Lumber Estimating board directly.</div>
+        <div class="scope-sec">Estimating Request</div>
+        <div class="fgrid" style="margin-bottom:20px">
+          <div class="fgroup"><label>Request Type</label><select><option>New Estimate Request</option><option>Revision / Update</option><option>Design Build</option><option>Recheck / Re-price</option></select></div>
+          <div class="fgroup"><label>Takeoff Type</label><select><option>Full Takeoff</option><option>Partial Takeoff</option><option>Rough Order of Magnitude</option></select></div>
+          <div class="fgroup"><label>Priority</label><select><option>Medium</option><option>High</option><option>Low</option></select></div>
+          <div class="fgroup"><label>Submittal Date</label><input type="date" value="2025-03-09"></div>
+          <div class="fgroup s2"><div class="cbrow"><input type="checkbox" id="so-cust-ml"><label class="cblbl" for="so-cust-ml">Customer Provided Material Lists</label></div></div>
+        </div>
+        <div class="scope-sec">Framing Specifications</div>
+        <div class="fgrid" style="margin-bottom:20px">
+          <div class="fgroup"><label>Wall Framing Type</label><select><option>2x4 Standard</option><option>2x6 Standard</option><option>Other</option></select></div>
+          <div class="fgroup"><label>Floor Framing Type</label><select><option>TJI / I-Joist</option><option>Dimensional Lumber</option><option>Open Web Truss</option></select></div>
+          <div class="fgroup"><label>Roof Framing Type</label><select><option>Pre-engineered Trusses</option><option>Stick Frame / Rafter</option></select></div>
+          <div class="fgroup"><label>EWP Brand</label><input type="text" value="Weyerhaeuser"></div>
+          <div class="fgroup"><label>Wall Sheathing</label><select><option>ZIP System</option><option>OSB 7/16"</option><option>OSB 1/2"</option><option>Plywood 1/2"</option></select></div>
+          <div class="fgroup"><label>Roof Sheathing</label><select><option>OSB 7/16"</option><option>OSB 1/2"</option><option>ZIP System Roof</option></select></div>
+          <div class="fgroup"><label>House Wrap</label><input type="text" value="ZIP System"></div>
+          <div class="fgroup"><label>Post/Beam Frame Spec</label><input type="text" placeholder="N/A"></div>
+          <div class="fgroup"><label>Interior Stair Framing</label><input type="text" placeholder="Closed stringer"></div>
+        </div>
+        <div class="scope-sec">Exterior &amp; Siding</div>
+        <div class="fgrid" style="margin-bottom:20px">
+          <div class="fgroup"><label>Trim Brand</label><input type="text" value="Kleer"></div>
+          <div class="fgroup"><label>Trim Thickness</label><input type="text" value='3/4"'></div>
+          <div class="fgroup"><label>Soffit/Fascia Brand</label><input type="text" placeholder="—"></div>
+          <div class="fgroup"><label>Fascia Thickness</label><input type="text" placeholder="—"></div>
+          <div class="fgroup"><label>Lap Siding Brand</label><input type="text" value="James Hardie"></div>
+          <div class="fgroup"><label>Vertical Siding Brand</label><input type="text" placeholder="N/A"></div>
+          <div class="fgroup s2"><label>Exterior Trim Notes</label><textarea placeholder="Additional notes…"></textarea></div>
+        </div>
+        <div class="scope-sec">Decking</div>
+        <div class="fgrid">
+          <div class="fgroup"><label>Decking Material</label><input type="text" placeholder="N/A"></div>
+          <div class="fgroup"><label>Deck Fascia/Trim</label><input type="text" placeholder="N/A"></div>
+          <div class="fgroup"><label>Deck Railing</label><input type="text" placeholder="N/A"></div>
+          <div class="fgroup s2"><label>Decking Notes</label><textarea placeholder="—"></textarea></div>
+        </div>
+      </div>
+    </div>
+    <div class="so-foot">
+      <div class="so-ok" id="proj-ok">✓ Saved to monday.com</div>
+      <button class="btn btn-ghost" onclick="closeOv('ov-project')">Discard</button>
+      <button class="btn btn-red" onclick="saveSO('proj-ok','ov-project')">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ LEAD SLIDE-OVER ════ -->
+<div class="overlay" id="ov-lead" onclick="closeOv('ov-lead')">
+  <div class="slideover" onclick="event.stopPropagation()">
+    <div class="so-head">
+      <div style="flex:1"><div class="so-title" id="so-lead-title">ABC Builders LLC</div><div class="so-bdgs"><span class="badge b-yellow">Warm</span><span class="badge b-blue">New</span></div></div>
+      <button class="x-btn" onclick="closeOv('ov-lead')">×</button>
+    </div>
+    <div class="so-qi"><div class="qi">👤 <strong>John Smith</strong></div><div class="qi">📞 <strong>555-0101</strong></div><div class="qi">✉️ <strong>john@abcbuilders.com</strong></div><div class="qi">📍 <strong>Denver, CO</strong></div></div>
+    <div class="so-body" style="padding-top:18px">
+      <div class="fgrid">
+        <div class="fgroup s2"><label>Company Name</label><input type="text" value="ABC Builders LLC"></div>
+        <div class="fgroup"><label>Customer Contact</label><input type="text" value="John Smith"></div>
+        <div class="fgroup"><label>Customer Phone</label><input type="tel" value="555-0101"></div>
+        <div class="fgroup"><label>Customer Email</label><input type="email" value="john@abcbuilders.com"></div>
+        <div class="fgroup"><label>Market Segment</label><select><option>Custom Builder</option><option>Production Builder</option></select></div>
+        <div class="fgroup"><label>Lead Status</label><select><option>Warm</option><option>Hot</option><option>Cold</option><option>Existing Customer</option></select></div>
+        <div class="fgroup"><label>Relationship Status</label><select><option>New</option><option>Active</option><option>Dormant</option><option>At Risk</option></select></div>
+        <div class="fgroup"><label>Next Steps</label><select><option>Setup a Meeting</option><option>Prospect Market Review</option><option>Credit App</option><option>Potential Quote</option></select></div>
+        <div class="fgroup"><label>Lead Source</label><select><option>Referral</option><option>Cold Call</option><option>Trade Show</option><option>Website</option></select></div>
+        <div class="fgroup"><label>Next Meeting</label><input type="date" value="2025-04-01"></div>
+        <div class="fgroup"><label>Next Meeting Type</label><select><option>Phone Call</option><option>Site Visit</option><option>Office Meeting</option><option>Teams/Zoom</option></select></div>
+        <div class="fgroup"><label>Last Contact</label><input type="date"></div>
+        <div class="fgroup s2"><label>Current Builders Relationship?</label><textarea>New prospect from trade show</textarea></div>
+        <div class="fgroup s2"><label>Notes</label><textarea>New lead from 2025 IBS show</textarea></div>
+      </div>
+      <button class="convert-btn" onclick="closeOv('ov-lead');showPage('new-project')">⚡ Convert to Project →</button>
+    </div>
+    <div class="so-foot">
+      <div class="so-ok" id="lead-ok">✓ Saved to monday.com</div>
+      <button class="btn btn-ghost" onclick="closeOv('ov-lead')">Discard</button>
+      <button class="btn btn-red" onclick="saveSO('lead-ok','ov-lead')">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ ESTIMATING SLIDE-OVER ════ -->
+<div class="overlay" id="ov-est" onclick="closeOv('ov-est')">
+  <div class="slideover" onclick="event.stopPropagation()">
+    <div class="so-head">
+      <div style="flex:1"><div class="so-title" id="so-est-title">Smith Residence – Lot 14</div><div class="so-bdgs"><span class="est-status es-incoming">● Incoming</span><span class="badge b-red" style="margin-left:4px">High Priority</span></div></div>
+      <button class="x-btn" onclick="closeOv('ov-est')">×</button>
+    </div>
+    <div class="so-qi"><div class="qi">🏗 <strong>ABC Builders LLC</strong></div><div class="qi">📍 <strong>Denver, CO</strong></div><div class="qi">📅 <strong>Bid Due: Mar 15</strong></div><div class="qi">👤 <strong>Tom Reynolds</strong></div></div>
+    <div class="so-tabs">
+      <div class="so-tab active" onclick="soTab(this,'soe-meta')">Request Info</div>
+      <div class="so-tab scope-tab active-scope" onclick="soTab(this,'soe-scope')" style="color:var(--yellow);opacity:1">📐 Scope Sheet</div>
+      <div class="so-tab" onclick="soTab(this,'soe-project')">Project Link</div>
+    </div>
+    <div class="so-body">
+      <!-- Meta -->
+      <div class="so-tc active" id="soe-meta">
+        <div class="fgrid">
+          <div class="fgroup"><label>Takeoff Status</label><select><option>Incoming / Not Assigned</option><option>Assigned / Not Started</option><option>Takeoff in Process</option><option>Waiting on Information</option><option>Completed &amp; Sent</option></select></div>
+          <div class="fgroup"><label>Assigned Estimator</label><select><option>— Unassigned —</option><option>Tom Reynolds</option><option>Dana Whitmore</option><option>Chris Patel</option></select></div>
+          <div class="fgroup"><label>Request Type</label><select><option>New Estimate Request</option><option>Revision / Update</option><option>Design Build</option><option>Recheck / Re-price</option><option>Value Engineering</option></select></div>
+          <div class="fgroup"><label>Priority</label><select><option>High</option><option>Medium</option><option>Low</option></select></div>
+          <div class="fgroup"><label>Submittal Date</label><input type="date" value="2026-02-25"></div>
+          <div class="fgroup"><label>Bid Due Date</label><input type="date" value="2026-03-15"></div>
+          <div class="fgroup s2"><div class="cbrow"><input type="checkbox" id="cml2"><label class="cblbl" for="cml2">Customer Provided Material Lists</label></div></div>
+          <div class="fgroup s2"><label>Comments / Notes</label><textarea placeholder="Estimating notes, questions for sales, scope clarifications…"></textarea></div>
+        </div>
+      </div>
+      <!-- Scope Sheet in estimating SO -->
+      <div class="so-tc" id="soe-scope">
+        <div class="scope-tab-notice">📐 Scope sheet submitted by sales. Estimators can flag missing info or add clarification notes below.</div>
+        <div class="scope-sec">Framing Specifications</div>
+        <div class="fgrid" style="margin-bottom:20px">
+          <div class="fgroup"><label>Wall Framing Type</label><select><option>2x4 Standard</option><option>2x6 Standard</option></select></div>
+          <div class="fgroup"><label>Floor Framing Type</label><select><option>TJI / I-Joist</option><option>Dimensional Lumber</option><option>Open Web Truss</option></select></div>
+          <div class="fgroup"><label>Roof Framing Type</label><select><option>Pre-engineered Trusses</option><option>Stick Frame / Rafter</option></select></div>
+          <div class="fgroup"><label>EWP Brand</label><input type="text" placeholder="—"></div>
+          <div class="fgroup"><label>Wall Sheathing</label><select><option>ZIP System</option><option>OSB 7/16"</option><option>OSB 1/2"</option></select></div>
+          <div class="fgroup"><label>Roof Sheathing</label><select><option>OSB 7/16"</option><option>OSB 1/2"</option></select></div>
+          <div class="fgroup"><label>House Wrap</label><input type="text" placeholder="—"></div>
+          <div class="fgroup"><label>Post/Beam Spec</label><input type="text" placeholder="N/A"></div>
+        </div>
+        <div class="scope-sec">Exterior &amp; Siding</div>
+        <div class="fgrid" style="margin-bottom:20px">
+          <div class="fgroup"><label>Trim Brand</label><input type="text" placeholder="—"></div>
+          <div class="fgroup"><label>Trim Thickness</label><input type="text" placeholder="—"></div>
+          <div class="fgroup"><label>Lap Siding Brand</label><input type="text" placeholder="—"></div>
+          <div class="fgroup"><label>Vertical Siding Brand</label><input type="text" placeholder="N/A"></div>
+          <div class="fgroup s2"><label>Exterior Trim Notes</label><textarea placeholder="—"></textarea></div>
+        </div>
+        <div class="scope-sec">Decking</div>
+        <div class="fgrid">
+          <div class="fgroup"><label>Decking Material</label><input type="text" placeholder="—"></div>
+          <div class="fgroup"><label>Deck Railing</label><input type="text" placeholder="—"></div>
+          <div class="fgroup s2"><label>Decking Notes</label><textarea placeholder="—"></textarea></div>
+        </div>
+        <div style="margin-top:16px;padding:12px 14px;background:var(--bg);border:1px solid var(--brd2);border-radius:7px">
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--yellow);margin-bottom:8px">Estimator Notes / Missing Info Flag</div>
+          <textarea placeholder="Flag any missing scope info here — this will notify the sales rep…" style="min-height:80px"></textarea>
+        </div>
+      </div>
+      <!-- Project Link -->
+      <div class="so-tc" id="soe-project">
+        <div style="padding:14px;background:var(--bg);border:1px solid var(--brd2);border-radius:8px;margin-bottom:16px">
+          <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;font-family:'DM Mono',monospace;letter-spacing:.08em;text-transform:uppercase">Linked Project Record</div>
+          <div style="font-weight:700;font-size:15px;margin-bottom:4px">Smith Residence – Lot 14</div>
+          <div style="font-size:12px;color:var(--txt3)">ABC Builders LLC · Denver, CO · Bid Due Mar 15</div>
+          <button class="btn btn-ghost" style="margin-top:10px;font-size:12px" onclick="closeOv('ov-est');openProject('smith')">Open Full Project Record →</button>
+        </div>
+        <div class="fgrid">
+          <div class="fgroup"><label>Outside Sales</label><input type="text" value="Tom Reynolds" readonly style="color:var(--txt3)"></div>
+          <div class="fgroup"><label>Inside Sales</label><input type="text" value="—" readonly style="color:var(--txt3)"></div>
+          <div class="fgroup"><label>Market Segment</label><input type="text" value="Custom Builder" readonly style="color:var(--txt3)"></div>
+          <div class="fgroup"><label>Builders Facility</label><input type="text" value="Colorado-Aurora" readonly style="color:var(--txt3)"></div>
+          <div class="fgroup s2"><label>File Location (Plans)</label><input type="text" value="\\server\plans\abc_smith_lot14" readonly style="color:var(--txt3)"></div>
+        </div>
+      </div>
+    </div>
+    <div class="so-foot">
+      <div class="so-ok" id="est-ok">✓ Saved to monday.com</div>
+      <button class="btn btn-ghost" onclick="closeOv('ov-est')">Discard</button>
+      <button class="btn btn-red" onclick="saveSO('est-ok','ov-est')">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── NAV ───
+const pageTitles = {
+  'projects':'My Projects','leads':'My Leads','estimating':'Estimating',
+  'pipeline':'Pipeline View','new-project':'New Project Request',
+  'new-lead':'New Lead','dashboard':'Dashboard'
+};
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.getElementById('page-title').textContent=pageTitles[id]||id;
+  const nav=document.getElementById('nav-'+id);
+  if(nav)nav.classList.add('active');
+}
+
+// ─── ROLE TOGGLE ───
+let currentRole='sales';
+function setRole(r){
+  currentRole=r;
+  document.getElementById('btn-sales').classList.toggle('active',r==='sales');
+  document.getElementById('btn-mgr').classList.toggle('active',r==='manager');
+  const banner=document.getElementById('mgr-banner');
+  banner.classList.toggle('show',r==='manager');
+  if(r==='manager'){
+    document.getElementById('av-initials').textContent='MV';
+    document.getElementById('u-name-display').textContent='Mike Vasquez';
+    document.getElementById('u-role-display').textContent='Sales Manager';
+    document.getElementById('badge-projects').textContent='12';
+    document.getElementById('badge-est').textContent='7';
+  } else {
+    document.getElementById('av-initials').textContent='TR';
+    document.getElementById('u-name-display').textContent='Tom Reynolds';
+    document.getElementById('u-role-display').textContent='Outside Sales';
+    document.getElementById('badge-projects').textContent='4';
+    document.getElementById('badge-est').textContent='2';
+  }
+}
+function updateViewAs(v){ /* would filter board data by rep */ }
+
+// ─── NOTIF ───
+function toggleNotif(){
+  const b=document.getElementById('notif-bar');
+  b.style.display=b.style.display==='none'?'flex':'none';
+}
+
+// ─── OVERLAYS ───
+function closeOv(id){document.getElementById(id).classList.remove('open')}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){['ov-project','ov-lead','ov-est'].forEach(closeOv)}});
+
+// ─── PROJECT SLIDEOVER ───
+const projData={
+  smith:{title:'Smith Residence – Lot 14',group:'Quoting'},
+  riverside:{title:'Riverside Phase 2',group:'On Hold'},
+  summit:{title:'Summit Custom Home',group:'Sold'},
+  oakpark:{title:'Oak Park Duplex',group:'Completed'}
+};
+function openProject(id,tab){
+  const d=projData[id]||{title:id,group:'Quoting'};
+  document.getElementById('so-proj-title').textContent=d.title;
+  document.getElementById('ov-project').classList.add('open');
+  document.getElementById('proj-ok').style.display='none';
+  if(tab==='scope'){
+    // activate scope tab
+    document.querySelectorAll('#ov-project .so-tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('#ov-project .so-tc').forEach(t=>t.classList.remove('active'));
+    document.getElementById('scope-tab-btn').classList.add('active');
+    document.getElementById('sot-scope').classList.add('active');
+  } else {
+    soTabReset('ov-project','so-tab','so-tc','sot-details');
+  }
+}
+
+// ─── LEAD SLIDEOVER ───
+const leadNames={abc:'ABC Builders LLC',xyz:'XYZ Homes Inc',summit:'Summit Framing Co',conv:'Converted Example LLC',dead:'Dead Lead Corp'};
+function openLead(id){
+  document.getElementById('so-lead-title').textContent=leadNames[id]||id;
+  document.getElementById('ov-lead').classList.add('open');
+  document.getElementById('lead-ok').style.display='none';
+}
+
+// ─── ESTIMATING SLIDEOVER ───
+const estData={
+  smith:{title:'Smith Residence – Lot 14'},
+  riverside:{title:'Riverside Phase 2'},
+  summit:{title:'Summit Custom Home'},
+  oakpark:{title:'Oak Park Duplex'}
+};
+function openEstimating(id){
+  const d=estData[id]||{title:id};
+  document.getElementById('so-est-title').textContent=d.title;
+  document.getElementById('ov-est').classList.add('open');
+  document.getElementById('est-ok').style.display='none';
+  soTabReset('ov-est','so-tab','so-tc','soe-meta');
+}
+
+// ─── TABS ───
+function soTab(el,showId){
+  const so=el.closest('.slideover');
+  so.querySelectorAll('.so-tab').forEach(t=>t.classList.remove('active'));
+  so.querySelectorAll('.so-tc').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById(showId).classList.add('active');
+}
+function soTabReset(ovId,tabCls,tcCls,firstId){
+  const so=document.getElementById(ovId).querySelector('.slideover');
+  so.querySelectorAll('.'+tabCls).forEach((t,i)=>{t.classList.toggle('active',i===0)});
+  so.querySelectorAll('.'+tcCls).forEach(t=>t.classList.remove('active'));
+  const first=document.getElementById(firstId);
+  if(first)first.classList.add('active');
+}
+
+// ─── SAVE CONFIRM ───
+function saveSO(okId,ovId){
+  const el=document.getElementById(okId);
+  el.style.display='flex';
+  setTimeout(()=>{el.style.display='none';closeOv(ovId);},1800);
+}
+
+// ─── PRODUCT TAGS + SCOPE TRIGGER ───
+function toggleProd(el,name){
+  el.classList.toggle('off');
+  checkScopeSheet();
+}
+function toggleTag(el){el.classList.toggle('off')}
+
+function checkScopeSheet(){
+  const tags=document.querySelectorAll('#products-wrap .mtag:not(.off)');
+  const names=[...tags].map(t=>t.textContent.trim());
+  const needsScope=names.includes('Loose Lumber')||names.includes('Full Package');
+  const card=document.getElementById('scope-card');
+  card.classList.toggle('visible',needsScope);
+  updateScopePreview();
+}
+
+function updateScopePreview(){
+  // pull values from form fields and show in scope sheet summary
+  const pname=document.querySelector('#page-new-project .fgrid input[placeholder*="Lot 14"]');
+  const cust=document.querySelector('#page-new-project select');
+  const facility=document.querySelectorAll('#page-new-project select')[3];
+  const biddue=document.getElementById('np-biddue');
+  document.getElementById('ss-project').textContent=pname&&pname.value?pname.value:'(enter project name above)';
+  document.getElementById('ss-customer').textContent=cust&&cust.value&&cust.value!=='— Select from Leads —'?cust.value:'(select customer above)';
+  document.getElementById('ss-facility').textContent=facility?facility.value:'—';
+  document.getElementById('ss-biddue').textContent=biddue&&biddue.value?biddue.value:'—';
+}
+
+// ─── NEW PROJECT SUBMIT ───
+function submitNewProject(){
+  const ok=document.getElementById('np-ok');
+  ok.style.display='flex';
+  setTimeout(()=>{ok.style.display='none';showPage('projects');},2000);
+}
+
+// ─── TABLE FILTER ───
+function filterTbl(tbodyId,q){
+  q=q.toLowerCase();
+  document.querySelectorAll('#'+tbodyId+' tr').forEach(r=>{
+    r.style.display=r.textContent.toLowerCase().includes(q)?'':'none';
+  });
+}
+function filterGroup(val){
+  document.querySelectorAll('#proj-tbody tr').forEach(r=>{
+    if(!val){r.style.display='';return;}
+    r.style.display=r.textContent.toLowerCase().includes(val.toLowerCase())?'':'none';
+  });
+}
+
+// .convert-btn style
+document.head.insertAdjacentHTML('beforeend',`<style>.convert-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:none;border:1px solid var(--brd2);border-radius:6px;color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:'Barlow',sans-serif;transition:all .15s;margin-top:16px}.convert-btn:hover{border-color:var(--red);color:var(--red);background:var(--red-dim)}</style>`);
+</script>
+</body>
+</html>

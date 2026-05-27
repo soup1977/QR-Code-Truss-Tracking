@@ -1,5 +1,5 @@
 """
-BuildersQRLabels.py — Builders Connect QR Label & Cloud Sync Manager
+BuildersQRLabels.py — Builders Truss QR QR Label & Cloud Sync Manager
 Builders Inc. — single-file desktop application (Windows only, Python 3.10+)
 
 Entry point:  python BuildersQRLabels.py
@@ -8,14 +8,13 @@ Architecture: AppConfig → JobDatabase → JobManager → StickerEngine
               BuildersQRLabelsApp (Tkinter UI — Phase 3)
 """
 
-__version__ = "0.9.0"
+__version__ = "0.9.1"
 
 # ── Standard library ──────────────────────────────────────────────────────────
 import json
 import logging
 import os
 import re
-import shutil
 import socket
 import sqlite3
 import tempfile
@@ -94,7 +93,6 @@ TOKEN_DROPBOX_FILE = "token_dropbox.json"
 TOKEN_ONEDRIVE_FILE = "token_onedrive.json"
 QR_SUFFIX = "_QR.svg"
 DROPBOX_UPLOAD_ROOT = "/Cloud Manager Uploads"
-WATCH_SUBDIR = "_Final Jobsite Package QR"
 JOB_ID_RE = re.compile(r"^\d{6}-\d{3}$")
 GRAPH_BASE = "https://graph.microsoft.com/v1.0/me/drive"
 
@@ -108,7 +106,7 @@ class JobInfo:
     """Single job record — persisted in the database and displayed in the UI."""
     job_id: str
     sticker_status: str = "Pending"    # Pending / Completed / Error
-    cloud_status: str = "Pending"      # Uploaded / Cloud Only / Local / CSV Only / Incomplete / Pending / Error
+    cloud_status: str = "Pending"      # Pending / Provisioned / Local / Uploaded / Cloud Only / Error
     sticker_qty: Optional[int] = None
     cloud_progress: str = "0%"
     last_updated: str = field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
@@ -122,19 +120,19 @@ class JobInfo:
 class AppConfig:
     """
     Loads and saves config.json.  Holds only per-machine / bootstrap settings.
-    Shared path config (watch_folder, target_folder, etc.) lives in JobDatabase.settings.
+    Shared path config (jobs_folder, log_path, etc.) lives in JobDatabase.settings.
     Writes are atomic: write to .tmp, then os.replace().
     """
 
     _DEFAULTS: dict = {
-        "db_path":             "",
-        "cloud_provider":      "dropbox",
+        "db_path":             "X:\\PROJECT\\QRCodes\\Database\\builders_qr_labels.db",
+        "cloud_provider":      "onedrive",
         "dropbox_app_key":     "",
         "dropbox_app_secret":  "",
         "onedrive_client_id":  "",
         "onedrive_tenant_id":  "common",
         "company_name":        "Builders Inc.",
-        "company_address":     "2644 Byington Solway Rd, Knoxville",
+        "company_address":     "17600 E. Smith Rd., Aurora, CO. 80011",
     }
 
     def __init__(self, config_path: str = CONFIG_FILE) -> None:
@@ -224,7 +222,7 @@ class UpdateChecker:
     version.json schema (IT maintains this file on the share):
       {
         "version": "0.9.1",
-        "installer_path": "\\\\SERVER\\BuildersQRLabels\\BuildersConnect-0.9.1-Setup.exe",
+        "installer_path": "\\\\SERVER\\BuildersQRLabels\\BuildersTrussQR-0.9.1-Setup.exe",
         "release_notes": "Bug fixes and improvements"
       }
 
@@ -267,7 +265,7 @@ class JobDatabase:
     """
     Wraps SQLite.  Owns two tables:
       jobs     — one row per job_id (sticker + cloud status)
-      settings — key/value shared config (watch_folder, target_folder, etc.)
+      settings — key/value shared config (jobs_folder, log_path, etc.)
 
     If db_path is a UNC path that is unreachable, falls back to a local DB
     without crashing the app.
@@ -391,6 +389,18 @@ class JobDatabase:
                 logging.exception("get_job failed for %s", job_id)
                 return None
 
+    def delete_job(self, job_id: str) -> None:
+        if not self._available:
+            return
+        with self._lock:
+            try:
+                conn = self._open()
+                conn.execute("DELETE FROM jobs WHERE job_id = ?", (job_id,))
+                conn.commit()
+                conn.close()
+            except Exception:
+                logging.exception("delete_job failed for %s", job_id)
+
     @staticmethod
     def _row_to_job(row: sqlite3.Row) -> JobInfo:
         return JobInfo(
@@ -489,6 +499,11 @@ class CloudProvider(ABC):
     @abstractmethod
     def list_folder_files(self, cloud_folder: str) -> list[str]:
         """Return list of filenames in the cloud folder."""
+
+    def create_folder_and_get_link(self, job_id: str) -> str:
+        """Create the cloud folder for job_id and return a public share URL."""
+        cloud_folder = self.ensure_folder(job_id)
+        return self.create_share_link(cloud_folder)
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -935,36 +950,29 @@ class JobManager:
     # ── Folder path helpers (read from shared DB settings) ───────────────────
 
     @property
-    def watch_folder(self) -> str:
-        return self._db.get_setting("watch_folder")
-
-    @property
-    def target_folder(self) -> str:
-        return self._db.get_setting("target_folder")
+    def jobs_folder(self) -> str:
+        val = self._db.get_setting("jobs_folder")
+        if not val:                               # migrate from old key on first run
+            val = self._db.get_setting("target_folder")
+            if val:
+                self._db.set_setting("jobs_folder", val)
+        return os.path.normpath(val) if val else val
 
     # ── Main scan ────────────────────────────────────────────────────────────
 
     def scan_all(self) -> list[JobInfo]:
         """
-        Scan target + watch folders, classify all jobs, upsert to DB.
+        Scan jobs_folder, classify all jobs, upsert to DB.
         Returns sorted list of JobInfo.
         """
-        target = self.target_folder
-        watch = self.watch_folder
+        folder = self.jobs_folder
         jobs: dict[str, JobInfo] = {}
 
-        # Local jobs from target folder
-        if target and os.path.isdir(target):
-            for name in os.listdir(target):
-                if JOB_ID_RE.match(name) and os.path.isdir(os.path.join(target, name)):
+        if folder and os.path.isdir(folder):
+            for name in os.listdir(folder):
+                if JOB_ID_RE.match(name) and os.path.isdir(os.path.join(folder, name)):
                     status, qty = self.classify_sticker_status(name)
                     jobs[name] = JobInfo(job_id=name, sticker_status=status, sticker_qty=qty)
-
-        # Pending jobs visible only in the watch folder
-        if watch and os.path.isdir(watch):
-            for job_id in self._find_watch_jobs(watch):
-                if job_id not in jobs:
-                    jobs[job_id] = JobInfo(job_id=job_id, sticker_status="Pending")
 
         # Cloud status
         cloud_jobs: dict[str, str] = {}
@@ -975,10 +983,25 @@ class JobManager:
                 logging.exception("Cloud job list failed")
 
         for job_id, info in jobs.items():
+            db_job = self._db.get_job(job_id)
+            db_status = db_job.cloud_status if db_job else "Pending"
             info.cloud_status, info.cloud_progress = self._classify_cloud_status(
-                job_id, cloud_jobs
+                job_id, cloud_jobs, db_status
             )
             self._db.upsert_job(info)
+
+        # Prune DB records with no local folder.
+        # Cloud-terminal statuses (Uploaded, Cloud Only) are kept — folder may be
+        # intentionally absent after upload.  Everything else is an orphan.
+        _KEEP_STATUSES = {"Uploaded", "Cloud Only"}
+        pruned = 0
+        for db_job in self._db.get_all_jobs():
+            if db_job.job_id not in jobs and db_job.cloud_status not in _KEEP_STATUSES:
+                self._db.delete_job(db_job.job_id)
+                pruned += 1
+                log.info("Pruned orphaned job from DB: %s", db_job.job_id)
+        if pruned:
+            log.info("Pruned %d orphaned job(s) from DB", pruned)
 
         result = sorted(jobs.values(), key=lambda j: j.job_id)
         log.info("Scan complete: %d jobs found", len(result))
@@ -989,9 +1012,9 @@ class JobManager:
     def classify_sticker_status(self, job_id: str) -> tuple[str, Optional[int]]:
         """
         Return (status, qty_or_None) by inspecting the job folder contents.
-        Requires target_folder to be set.
+        Requires jobs_folder to be set.
         """
-        target = self.target_folder
+        target = self.jobs_folder
         if not target:
             return "Error", None
         folder = os.path.join(target, job_id)
@@ -1018,135 +1041,93 @@ class JobManager:
     # ── Cloud status ──────────────────────────────────────────────────────────
 
     def _classify_cloud_status(
-        self, job_id: str, cloud_jobs: dict[str, str]
+        self, job_id: str, cloud_jobs: dict[str, str], db_status: str = "Pending"
     ) -> tuple[str, str]:
         """Return (cloud_status, progress_pct)."""
-        target = self.target_folder
+        folder = self.jobs_folder
         in_cloud = job_id in cloud_jobs
-        has_local = bool(target) and os.path.isdir(os.path.join(target, job_id))
+        has_local = bool(folder) and os.path.isdir(os.path.join(folder, job_id))
 
-        if in_cloud and has_local:
-            return "Uploaded", "100%"
         if in_cloud and not has_local:
             return "Cloud Only", "100%"
+        if in_cloud and db_status == "Uploaded":
+            return "Uploaded", "100%"
         if not has_local:
             return "Pending", "0%"
 
         # Local only — granular progress
-        files = os.listdir(os.path.join(target, job_id))
-        has_pdf = f"Stickers_{job_id}.pdf" in files
-        has_csv = any(f.lower().endswith(".csv") for f in files)
+        files = os.listdir(os.path.join(folder, job_id))
+        has_pdf  = f"Stickers_{job_id}.pdf" in files
+        has_qr   = any("_qr.svg" in f.lower() for f in files)
 
+        if in_cloud and has_pdf:
+            return "Uploaded", "100%"
         if has_pdf:
-            return "Local", "50%"
-        if has_csv:
-            return "CSV Only", "25%"
-        return "Incomplete", "25%"
-
-    # ── Watch folder helpers ──────────────────────────────────────────────────
-
-    def find_watch_source(self, job_id: str) -> Optional[str]:
-        """
-        Walk the watch folder tree for a _Final Jobsite Package QR subfolder
-        that contains {job_id}.csv.  Returns path or None.
-        """
-        watch = self.watch_folder
-        if not watch or not os.path.isdir(watch):
-            return None
-        for root, dirs, _ in os.walk(watch):
-            if WATCH_SUBDIR in dirs:
-                candidate = os.path.join(root, WATCH_SUBDIR)
-                if any(f.lower() == f"{job_id}.csv" for f in os.listdir(candidate)):
-                    return candidate
-        return None
-
-    def copy_watch_to_target(self, job_id: str) -> bool:
-        """
-        Copy valid files from the watch source to the target folder.
-        Excludes files matching {job_id}_JOB_* pattern.
-        Returns True if at least one file was copied.
-        """
-        source = self.find_watch_source(job_id)
-        if not source:
-            log.warning("No watch source found for job %s", job_id)
-            return False
-        target = self.target_folder
-        if not target:
-            log.error("Target folder not configured")
-            return False
-
-        dest = os.path.join(target, job_id)
-        os.makedirs(dest, exist_ok=True)
-
-        copied = 0
-        for fname in os.listdir(source):
-            if re.match(rf"{re.escape(job_id)}_JOB_", fname, flags=re.IGNORECASE):
-                log.debug("Skipping JOB exclusion file: %s", fname)
-                continue
-            src_path = os.path.join(source, fname)
-            if os.path.isfile(src_path):
-                shutil.copy2(src_path, os.path.join(dest, fname))
-                copied += 1
-
-        log.info("Copied %d file(s) from watch → target for job %s", copied, job_id)
-        return copied > 0
-
-    def _find_watch_jobs(self, watch: str) -> list[str]:
-        """Return job IDs found anywhere under the watch folder tree."""
-        found: list[str] = []
-        for root, dirs, files in os.walk(watch):
-            if os.path.basename(root) == WATCH_SUBDIR:
-                for fname in files:
-                    if fname.lower().endswith(".csv"):
-                        stem = os.path.splitext(fname)[0]
-                        if JOB_ID_RE.match(stem) and stem not in found:
-                            found.append(stem)
-        return found
+            return "Local", "66%"
+        if has_qr:
+            return "Provisioned", "33%"
+        return "Pending", "0%"
 
     # ── Cloud upload / download ───────────────────────────────────────────────
 
-    def upload_job(self, job_id: str, cloud: CloudProvider) -> str:
+    def provision_job(self, job_id: str, cloud: CloudProvider) -> str:
         """
-        Upload all valid files from the target job folder to cloud.
-        Generates a share QR SVG after upload and uploads it too.
-        Returns the public share URL.
+        Create the cloud folder for job_id, get the share URL, write {job_id}_QR.svg locally.
+        Returns the share URL.  Raises on failure.
+        Must be called before generate_pdf so the QR code is valid.
         """
-        target = self.target_folder
-        if not target:
-            raise RuntimeError("Target folder is not configured.")
-        job_folder = os.path.join(target, job_id)
+        folder = self.jobs_folder
+        if not folder:
+            raise RuntimeError("Jobs folder is not configured.")
+        job_folder = os.path.join(folder, job_id)
+        if not os.path.isdir(job_folder):
+            raise RuntimeError(f"Job folder not found: {job_folder}")
+
+        share_url = cloud.create_folder_and_get_link(job_id)
+        qr_path = os.path.join(job_folder, f"{job_id}{QR_SUFFIX}")
+        generate_share_qr(share_url, qr_path)
+        log.info("Provisioned job %s → %s", job_id, share_url)
+        return share_url
+
+    def upload_job(self, job_id: str, cloud: CloudProvider) -> None:
+        """
+        Upload local files from the jobs folder to the already-provisioned cloud folder.
+        Only uploads *.pdf files, excluding Stickers_{job_id}.pdf and {job_id}_JOB_* files.
+        """
+        folder = self.jobs_folder
+        if not folder:
+            raise RuntimeError("Jobs folder is not configured.")
+        job_folder = os.path.join(folder, job_id)
         if not os.path.isdir(job_folder):
             raise RuntimeError(f"Local job folder not found: {job_folder}")
 
         cloud_folder = cloud.ensure_folder(job_id)
 
         for fname in os.listdir(job_folder):
+            if not fname.lower().endswith(".pdf"):
+                log.debug("Skipping non-PDF file: %s", fname)
+                continue
             if re.match(rf"{re.escape(job_id)}_JOB_", fname, flags=re.IGNORECASE):
+                continue
+            if fname.lower() == f"stickers_{job_id}.pdf".lower():
+                log.debug("Skipping sticker PDF (not uploaded): %s", fname)
                 continue
             fpath = os.path.join(job_folder, fname)
             if os.path.isfile(fpath):
                 log.info("Uploading %s for job %s", fname, job_id)
                 cloud.upload_file(fpath, cloud_folder)
 
-        share_url = cloud.create_share_link(cloud_folder)
-
-        # Generate the QR SVG from the share URL and upload it
-        qr_path = os.path.join(job_folder, f"{job_id}{QR_SUFFIX}")
-        generate_share_qr(share_url, qr_path)
-        cloud.upload_file(qr_path, cloud_folder)
-
-        log.info("Job %s uploaded. Share URL: %s", job_id, share_url)
-        return share_url
+        log.info("Job %s uploaded to cloud.", job_id)
 
     def download_job(self, job_id: str, cloud: CloudProvider, cloud_folder: str) -> None:
         """
         Download CSV, PDF, SVG, and TXT files for job_id from cloud to the
-        target folder.  Skips _JOB_* files.
+        jobs folder.  Skips _JOB_* files.
         """
-        target = self.target_folder
-        if not target:
-            raise RuntimeError("Target folder is not configured.")
-        job_folder = os.path.join(target, job_id)
+        folder = self.jobs_folder
+        if not folder:
+            raise RuntimeError("Jobs folder is not configured.")
+        job_folder = os.path.join(folder, job_id)
         os.makedirs(job_folder, exist_ok=True)
 
         for fname in cloud.list_folder_files(cloud_folder):
@@ -1236,14 +1217,15 @@ class StickerEngine:
         """
         Parse CSV, filter to job_id rows.
         Returns (list_of_truss_dicts, error_message_or_None).
-        Each dict: trsname, trusstype, batch, customer, jobname, qty, ply.
+        Each dict: label, type, batch, customer, jobname, qty, plies.
+        Batch is extracted from "JobNumber-BatchNumber" form — only BatchNumber is kept.
         """
         try:
             df = pd.read_csv(csv_path)
             df.columns = df.columns.str.lower().str.strip()
 
-            required = {"jobnumber", "trsname", "trusstype", "batch",
-                        "customer", "jobname", "qty", "ply"}
+            required = {"jobnumber", "label", "type", "batch",
+                        "customer", "jobname", "qty", "plies"}
             missing = required - set(df.columns)
             if missing:
                 return [], f"Missing columns: {', '.join(sorted(missing))}"
@@ -1255,22 +1237,25 @@ class StickerEngine:
 
             trusses = []
             for _, row in df.iterrows():
+                raw_batch = str(row["batch"]).strip()
+                # Batch is "JobNumber-BatchNumber" — keep only the BatchNumber part
+                batch_code = raw_batch.rsplit("-", 1)[-1]
                 trusses.append({
-                    "trsname":   str(row["trsname"]).strip(),
-                    "trusstype": str(row["trusstype"]).strip(),
-                    "batch":     str(row["batch"]).strip(),
-                    "customer":  str(row["customer"]).strip()[:25],
-                    "jobname":   str(row["jobname"]).strip()[:25],
-                    "qty":       int(row["qty"]),
-                    "ply":       int(row["ply"]),
+                    "label":    str(row["label"]).strip(),
+                    "type":     str(row["type"]).strip(),
+                    "batch":    batch_code,
+                    "customer": str(row["customer"]).strip()[:25],
+                    "jobname":  str(row["jobname"]).strip()[:25],
+                    "qty":      int(row["qty"]),
+                    "plies":    int(row["plies"]),
                 })
             return trusses, None
         except Exception as exc:
             logging.exception("CSV parse error: %s", csv_path)
             return [], str(exc)
 
-    def calculate_sticker_count(self, qty: int, ply: int) -> int:
-        return qty if ply == 1 else qty * ply
+    def calculate_sticker_count(self, qty: int, plies: int) -> int:
+        return qty if plies == 1 else qty * plies
 
     # ── PDF generation ────────────────────────────────────────────────────────
 
@@ -1292,13 +1277,13 @@ class StickerEngine:
         c = PDFCanvas(pdf_path, pagesize=(self.STICKER_W, self.STICKER_H))
 
         for truss in trusses:
-            is_ply = truss["ply"] > 1
+            is_ply = truss["plies"] > 1
             label_char = "P" if is_ply else "Q"
-            count = self.calculate_sticker_count(truss["qty"], truss["ply"])
+            count = self.calculate_sticker_count(truss["qty"], truss["plies"])
             for idx in range(1, count + 1):
                 sticker_type = f"{label_char}{idx:02d}/{count:02d}"
                 token_data = self._register_sticker_token(
-                    job_id, truss["trsname"], sticker_type
+                    job_id, truss["label"], sticker_type
                 )
                 self._draw_sticker(
                     c,
@@ -1356,7 +1341,7 @@ class StickerEngine:
         # ── Right QR — token data ─────────────────────────────────────────────
         right_qr_x = W - qs - m
         right_qr_y = 4 * mm
-        qr_data = f"{truss['batch']}|{truss['trsname']}|{sticker_type}|{token}"
+        qr_data = f"{truss['batch']}|{truss['label']}|{sticker_type}|{token}"
         tmp_png: Optional[str] = None
         try:
             qr = qrcode.QRCode(
@@ -1388,21 +1373,21 @@ class StickerEngine:
         # Row 1 — Job ID | Customer | Sticker counter
         row1_y = H - 4 * mm
         c.setFont("Helvetica-Bold", 10)
-        c.drawString(tx_left, row1_y, job_id)
+        c.drawString(left_qr_x, row1_y, job_id)
 
         c.setFont("Helvetica-Bold", 9)
         c.drawCentredString(tx_center, row1_y, truss["customer"])
 
         c.setFont("Helvetica-Bold", 7)
-        c.drawRightString(tx_right, row1_y, sticker_type)
+        c.drawRightString(W - m, row1_y, sticker_type)
 
         # Row 2 — Job name
         row2_y = H - 7 * mm
         c.setFont("Helvetica", 7)
         c.drawCentredString(tx_center, row2_y, truss["jobname"])
 
-        # Large truss code (trsname) centered in the QR zone
-        code = truss["trsname"]
+        # Large truss code (label) centered in the QR zone
+        code = truss["label"]
         code_len = len(code)
         if code_len <= 4:
             font_size = 48
@@ -1439,17 +1424,16 @@ class StickerEngine:
         rows: list[str] = [header, sep]
 
         for truss in trusses:
-            is_ply = truss["ply"] > 1
+            is_ply = truss["plies"] > 1
             label_char = "P" if is_ply else "Q"
-            count = self.calculate_sticker_count(truss["qty"], truss["ply"])
-            batch_display = str(truss["batch"])[-2:]
+            count = self.calculate_sticker_count(truss["qty"], truss["plies"])
             for idx in range(1, count + 1):
                 label = f"{label_char}{idx:02d}/{count:02d}"
-                key = f"{job_id}|{truss['trsname']}|{label}"
+                key = f"{job_id}|{truss['label']}|{label}"
                 token = self._tokens.get(key, {}).get("token", "")
                 rows.append(
-                    f"| {job_id} | {truss['trsname']:<8} | {truss['trusstype']:<12} "
-                    f"| {label:<9} | {token:<12} | {batch_display:<5} | No     |"
+                    f"| {job_id} | {truss['label']:<8} | {truss['type']:<12} "
+                    f"| {label:<9} | {token:<12} | {truss['batch']:<5} | No     |"
                 )
             if is_ply:
                 ply_total += count
@@ -1470,9 +1454,9 @@ class StickerEngine:
     # ── Token management ──────────────────────────────────────────────────────
 
     def _register_sticker_token(
-        self, job_id: str, trsname: str, sticker_type: str, token: str = ""
+        self, job_id: str, label: str, sticker_type: str, token: str = ""
     ) -> dict:
-        key = f"{job_id}|{trsname}|{sticker_type}"
+        key = f"{job_id}|{label}|{sticker_type}"
         if key not in self._tokens:
             self._tokens[key] = {
                 "token":     token or uuid.uuid4().hex[:12],
@@ -1498,12 +1482,12 @@ class StickerEngine:
                     parts = [p.strip() for p in line.split("|")]
                     if len(parts) < 7:
                         continue
-                    row_job = parts[1]
-                    trsname = parts[2]
-                    label   = parts[4]
-                    token   = parts[5]
+                    row_job      = parts[1]
+                    truss_label  = parts[2]
+                    sticker_type = parts[4]
+                    token        = parts[5]
                     if JOB_ID_RE.match(row_job) and row_job == job_id and token:
-                        self._register_sticker_token(row_job, trsname, label, token)
+                        self._register_sticker_token(row_job, truss_label, sticker_type, token)
                         recovered += 1
         except Exception:
             logging.exception("Token recovery failed for %s", summary_path)
@@ -1541,11 +1525,13 @@ class BuildersQRLabelsApp:
 
     # ── Row tag → background colour ───────────────────────────────────────────
     _TAG_BG = {
-        "done":       "#c8e6c9",   # sticker complete + uploaded
-        "partial":    "#fff9c4",   # pending or complete-not-uploaded
-        "cloud_only": "#bbdefb",   # exists in cloud but not locally
-        "active":     "#bbdefb",   # in-progress (generating / uploading)
-        "error":      "#ffcdd2",   # any error
+        "done":        "#c8e6c9",  # sticker complete + uploaded
+        "provisioned": "#fff9c4",  # provisioned (QR SVG ready), not yet generated
+        "local":       "#ffcdd2",  # sticker generated but not uploaded (red = action needed)
+        "cloud_only":  "#bbdefb",  # exists in cloud but not locally
+        "active":      "#bbdefb",  # in-progress (generating / uploading)
+        "error":       "#ffcdd2",  # any error
+        "partial":     "#fff9c4",  # generic pending
     }
 
     # ── Sort key map: column id → JobInfo attribute or callable ───────────────
@@ -1560,9 +1546,15 @@ class BuildersQRLabelsApp:
 
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        self.root.title(f"Builders Connect — QR Labels  v{__version__}")
+        self.root.title(f"Builders Truss QR — QR Labels  v{__version__}")
         self.root.minsize(600, 450)
         _center_window(self.root, 700, 650)
+        _ico = os.path.join("icons", "trussQR.ico")
+        if os.path.isfile(_ico):
+            try:
+                self.root.iconbitmap(_ico)
+            except Exception:
+                pass
 
         # ── Backend objects ───────────────────────────────────────────────────
         self._config  = AppConfig()
@@ -1650,9 +1642,10 @@ class BuildersQRLabelsApp:
     def _bind_shortcuts(self) -> None:
         """Register global keyboard shortcuts on the root window."""
         self.root.bind("<F5>",               lambda _e: self._on_validate())
+        self.root.bind("<Control-p>",        lambda _e: self._on_provision())
         self.root.bind("<Control-g>",        lambda _e: self._on_generate())
         self.root.bind("<Control-u>",        lambda _e: self._on_upload())
-        self.root.bind("<Control-S>",        lambda _e: self._on_sync_all())   # Ctrl+Shift+S
+        self.root.bind("<Control-S>",        lambda _e: self._on_process_all())   # Ctrl+Shift+S
         self.root.bind("<Control-comma>",    lambda _e: self._on_settings())
         self.root.bind("<Control-a>",        lambda _e: self._tree.selection_set(
                                                 self._tree.get_children()))
@@ -1663,12 +1656,11 @@ class BuildersQRLabelsApp:
         btn: dict[str, Any] = dict(relief=tk.FLAT, bg="#ececec", padx=6, pady=3,
                                    activebackground="#d0d0d0", cursor="hand2")
         left_buttons = [
-            ("Jobs Folder",   self._on_select_folder),
-            ("Watch Folder",  self._on_watch_folder),
-            ("Validate",      self._on_validate),
+            ("Refresh",       self._on_validate),
+            ("Provision",     self._on_provision),
             ("Generate",      self._on_generate),
             ("Upload",        self._on_upload),
-            ("Sync All",      self._on_sync_all),
+            ("Process All",   self._on_process_all),
         ]
         for label, cmd in left_buttons:
             tk.Button(parent, text=label, command=cmd, **btn).pack(
@@ -1763,6 +1755,12 @@ class BuildersQRLabelsApp:
         self._lbl_errors.pack(side=tk.RIGHT, padx=6)
         self._lbl_errors.bind("<Button-1>", lambda _e: self._show_error_log())
 
+        self._progress_bar = ttk.Progressbar(
+            parent, mode="determinate", length=120, maximum=1, value=0)
+        self._progress_bar.pack(side=tk.RIGHT, padx=(0, 4))
+        self._lbl_progress = tk.Label(parent, text="", **lbl)
+        self._lbl_progress.pack(side=tk.RIGHT)
+
     def _setup_banner(self, parent: tk.Frame) -> None:
         for fname in ("banner.png", "banner.jpg",
                       os.path.join("icons", "banner.png")):
@@ -1817,7 +1815,7 @@ class BuildersQRLabelsApp:
             self._update_bar = None
 
     def _load_icons(self) -> None:
-        for name in ("folder", "watch", "validate", "generate",
+        for name in ("folder", "refresh", "provision", "generate",
                      "upload", "sync", "settings"):
             for ext in (".png", ".gif"):
                 path = os.path.join("icons", name + ext)
@@ -1831,25 +1829,15 @@ class BuildersQRLabelsApp:
     # ── Toolbar handlers ──────────────────────────────────────────────────────
 
     def _on_select_folder(self) -> None:
-        current = self._db.get_setting("target_folder")
+        current = self._manager.jobs_folder
         folder = filedialog.askdirectory(
-            title="Select Local Jobsite Package Folder",
+            title="Select Jobs Folder",
             initialdir=current or os.path.expanduser("~"),
         )
         if folder:
-            self._db.set_setting("target_folder", folder)
-            log.info("Target folder set: %s", folder)
-            self._run(self._scan_task)
-
-    def _on_watch_folder(self) -> None:
-        current = self._db.get_setting("watch_folder")
-        folder = filedialog.askdirectory(
-            title="Select Watch Folder",
-            initialdir=current or os.path.expanduser("~"),
-        )
-        if folder:
-            self._db.set_setting("watch_folder", folder)
-            log.info("Watch folder set: %s", folder)
+            folder = os.path.normpath(folder)
+            self._db.set_setting("jobs_folder", folder)
+            log.info("Jobs folder set: %s", folder)
             self._run(self._scan_task)
 
     def _on_validate(self) -> None:
@@ -1871,6 +1859,26 @@ class BuildersQRLabelsApp:
             return
         self._mark_active(eligible)
         self._run(self._generate_task, eligible)
+
+    def _on_provision(self) -> None:
+        if not self._cloud or not self._cloud.is_authenticated():
+            messagebox.showwarning("Provision",
+                                   "Cloud provider is not authenticated.\n"
+                                   "Open Settings to connect.")
+            return
+        selected = self._selected_job_ids()
+        if not selected:
+            messagebox.showinfo("Provision", "Select one or more jobs first.")
+            return
+        eligible = [
+            jid for jid in selected
+            if (j := self._job_by_id(jid)) and j.cloud_status in ("Pending", "Error")
+        ]
+        if not eligible:
+            messagebox.showinfo("Provision", "No Pending jobs in selection.")
+            return
+        self._mark_active(eligible)
+        self._run(self._provision_task, eligible)
 
     def _on_upload(self) -> None:
         if not self._cloud or not self._cloud.is_authenticated():
@@ -1896,32 +1904,34 @@ class BuildersQRLabelsApp:
         self._mark_active(eligible)
         self._run(self._upload_task, eligible)
 
-    def _on_sync_all(self) -> None:
-        if not self._db.get_setting("target_folder"):
-            messagebox.showwarning("Sync All", "Local Jobsite Package Folder is not configured.")
+    def _on_process_all(self) -> None:
+        if not self._manager.jobs_folder:
+            messagebox.showwarning("Process All", "Jobs folder is not configured.")
             return
-        to_generate = [j.job_id for j in self._jobs if j.sticker_status == "Pending"]
+        cloud_ok = bool(self._cloud and self._cloud.is_authenticated())
+        to_provision = (
+            [j.job_id for j in self._jobs if j.cloud_status == "Pending"]
+            if cloud_ok else []
+        )
+        to_generate = [
+            j.job_id for j in self._jobs
+            if j.sticker_status == "Pending"
+            and j.cloud_status in ("Provisioned", "Local")
+        ]
         to_upload = (
             [
                 j.job_id for j in self._jobs
-                if j.sticker_status == "Completed" and j.cloud_status != "Uploaded"
+                if j.sticker_status == "Completed"
+                and j.cloud_status not in ("Uploaded", "Cloud Only")
             ]
-            if self._cloud and self._cloud.is_authenticated()
-            else []
+            if cloud_ok else []
         )
-        if not to_generate and not to_upload:
-            messagebox.showinfo("Sync All", "All jobs are up to date.")
+        if not to_provision and not to_generate and not to_upload:
+            messagebox.showinfo("Process All", "All jobs are up to date.")
             return
-        all_active = list(dict.fromkeys(to_generate + to_upload))
+        all_active = list(dict.fromkeys(to_provision + to_generate + to_upload))
         self._mark_active(all_active)
-        if to_generate:
-            self._run(self._generate_task, to_generate)
-        if to_upload:
-            self._run(self._upload_task, to_upload)
-        elif to_generate and not (self._cloud and self._cloud.is_authenticated()):
-            messagebox.showinfo("Sync All",
-                                f"{len(to_generate)} job(s) queued for generation.\n"
-                                "Cloud upload skipped — provider not authenticated.")
+        self._run(self._process_all_task, to_provision, to_generate, to_upload)
 
     def _on_settings(self) -> None:
         dlg = SettingsDialog(self.root, self._config, self._db)
@@ -1960,6 +1970,17 @@ class BuildersQRLabelsApp:
 
     def _update_tree_partial(self, fresh_jobs: list[JobInfo]) -> None:
         """Update only rows whose status changed — avoids full flicker on auto-refresh."""
+        fresh_ids = {j.job_id for j in fresh_jobs}
+
+        # Remove jobs no longer present in the DB (pruned by scan_all)
+        for job in list(self._jobs):
+            if job.job_id not in fresh_ids:
+                self._jobs.remove(job)
+                try:
+                    self._tree.delete(job.job_id)
+                except tk.TclError:
+                    pass
+
         current_ids = {j.job_id for j in self._jobs}
         for job in fresh_jobs:
             if job.job_id not in current_ids:
@@ -2001,6 +2022,10 @@ class BuildersQRLabelsApp:
             return "done"
         if job.cloud_status == "Cloud Only":
             return "cloud_only"
+        if job.cloud_status == "Local":
+            return "local"
+        if job.cloud_status == "Provisioned":
+            return "provisioned"
         return "partial"
 
     def _tree_values(self, job: JobInfo) -> tuple:
@@ -2087,9 +2112,9 @@ class BuildersQRLabelsApp:
             self._open_job_folder(iid)
 
     def _open_job_folder(self, job_id: str) -> None:
-        target = self._db.get_setting("target_folder")
+        target = self._manager.jobs_folder
         if not target:
-            messagebox.showwarning("Open Folder", "Local Jobsite Package Folder not configured.")
+            messagebox.showwarning("Open Folder", "Jobs folder not configured.")
             return
         path = os.path.join(target, job_id)
         if os.path.isdir(path):
@@ -2128,11 +2153,11 @@ class BuildersQRLabelsApp:
             jobs = self._manager.scan_all()
 
             # Recover sticker tokens for completed jobs
-            target = self._db.get_setting("target_folder")
-            if target:
+            jobs_folder = self._manager.jobs_folder
+            if jobs_folder:
                 for job in jobs:
                     if job.sticker_status == "Completed":
-                        folder = os.path.join(target, job.job_id)
+                        folder = os.path.join(jobs_folder, job.job_id)
                         if os.path.isdir(folder):
                             self._engine.recover_tokens_from_summary(
                                 folder, job.job_id)
@@ -2148,16 +2173,147 @@ class BuildersQRLabelsApp:
         finally:
             self._scan_lock.release()
 
+    def _provision_task(self, job_ids: list[str]) -> None:
+        if self._cloud is None:
+            self._ui(messagebox.showwarning, "Provision", "Cloud provider is not available.")
+            return
+        n = len(job_ids)
+        self._ui(self._set_progress, "Provisioning…", 0, n)
+        success, errors = 0, []
+        for i, job_id in enumerate(job_ids, 1):
+            try:
+                self._manager.provision_job(job_id, self._cloud)
+                job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
+                job.cloud_status   = "Provisioned"
+                job.cloud_progress = "33%"
+                job.last_updated   = datetime.now().isoformat(timespec="seconds")
+                self._db.upsert_job(job)
+                success += 1
+                _j = job
+                self._ui(lambda j=_j: self._update_job_row(j))
+            except Exception as exc:
+                logging.exception("Provision failed for %s", job_id)
+                self._session_errors += 1
+                errors.append(f"{job_id}: {exc}")
+                err_job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
+                err_job.cloud_status = "Error"
+                err_job.last_updated = datetime.now().isoformat(timespec="seconds")
+                self._db.upsert_job(err_job)
+                _ej = err_job
+                self._ui(lambda j=_ej: self._update_job_row(j))
+            self._ui(self._set_progress, f"Provisioning {i} of {n}…", i, n)
+        self._ui(self._clear_progress)
+        self._ui(self._update_statusbar)
+        msg = f"Provisioned {success} job(s) successfully."
+        if errors:
+            msg += f"\n\nErrors ({len(errors)}):\n" + "\n".join(errors)
+            self._ui(messagebox.showwarning, "Provision Complete", msg)
+        else:
+            self._ui(messagebox.showinfo, "Provision Complete", msg)
+
+    def _prompt_upload_after_generate(self, job_ids: list[str]) -> None:
+        """Called on the main thread after a successful generate run."""
+        msg = f"Generated {len(job_ids)} job(s).\n\nUpload to cloud now?"
+        if messagebox.askyesno("Generate Complete", msg):
+            if self._cloud and self._cloud.is_authenticated():
+                self._mark_active(job_ids)
+                self._run(self._upload_task, job_ids)
+            else:
+                messagebox.showwarning("Upload",
+                                       "Cloud provider is not authenticated.\n"
+                                       "Open Settings to connect.")
+
+    def _process_all_task(
+        self,
+        to_provision: list[str],
+        to_generate: list[str],
+        to_upload: list[str],
+    ) -> None:
+        """Background runner for Process All — runs Provision → Generate → Upload in order."""
+        if to_provision:
+            if self._cloud is None:
+                self._ui(messagebox.showwarning, "Process All",
+                         "Cloud provider unavailable — skipping provision.")
+            else:
+                n = len(to_provision)
+                self._ui(self._set_progress, "Provisioning…", 0, n)
+                for i, job_id in enumerate(to_provision, 1):
+                    try:
+                        self._manager.provision_job(job_id, self._cloud)
+                        job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
+                        job.cloud_status   = "Provisioned"
+                        job.cloud_progress = "33%"
+                        job.last_updated   = datetime.now().isoformat(timespec="seconds")
+                        self._db.upsert_job(job)
+                        _j = job
+                        self._ui(lambda j=_j: self._update_job_row(j))
+                    except Exception:
+                        logging.exception("Provision failed for %s", job_id)
+                        self._session_errors += 1
+                    self._ui(self._set_progress, f"Provisioning {i} of {n}…", i, n)
+
+        # After provisioning, the freshly-provisioned jobs become eligible for generation
+        all_to_generate = list(dict.fromkeys(to_provision + to_generate))
+        folder = self._manager.jobs_folder
+        if all_to_generate and folder:
+            n = len(all_to_generate)
+            self._ui(self._set_progress, "Generating…", 0, n)
+            for i, job_id in enumerate(all_to_generate, 1):
+                job_path = os.path.join(folder, job_id)
+                try:
+                    self._engine.generate_pdf(job_path)
+                    qty = JobManager._read_qty_from_summary(
+                        os.path.join(job_path, f"{job_id}_Stickers_Summary.txt"))
+                    job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
+                    job.sticker_status = "Completed"
+                    job.sticker_qty    = qty
+                    if job.cloud_status not in ("Uploaded", "Cloud Only"):
+                        job.cloud_status   = "Local"
+                        job.cloud_progress = "66%"
+                    job.last_updated = datetime.now().isoformat(timespec="seconds")
+                    self._db.upsert_job(job)
+                    _j = job
+                    self._ui(lambda j=_j: self._update_job_row(j))
+                except Exception:
+                    logging.exception("Generate failed for %s", job_id)
+                    self._session_errors += 1
+                self._ui(self._set_progress, f"Generating {i} of {n}…", i, n)
+
+        # Upload all eligible jobs (original to_upload list + newly generated)
+        all_to_upload = list(dict.fromkeys(to_upload + all_to_generate))
+        if all_to_upload and self._cloud and self._cloud.is_authenticated():
+            n = len(all_to_upload)
+            self._ui(self._set_progress, "Uploading…", 0, n)
+            for i, job_id in enumerate(all_to_upload, 1):
+                try:
+                    self._manager.upload_job(job_id, self._cloud)
+                    job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
+                    job.cloud_status   = "Uploaded"
+                    job.cloud_progress = "100%"
+                    job.last_updated   = datetime.now().isoformat(timespec="seconds")
+                    self._db.upsert_job(job)
+                    _j = job
+                    self._ui(lambda j=_j: self._update_job_row(j))
+                except Exception:
+                    logging.exception("Upload failed for %s", job_id)
+                    self._session_errors += 1
+                self._ui(self._set_progress, f"Uploading {i} of {n}…", i, n)
+
+        self._ui(self._clear_progress)
+        self._ui(self._update_statusbar)
+
     def _generate_task(self, job_ids: list[str]) -> None:
-        target = self._db.get_setting("target_folder")
-        if not target:
+        folder = self._manager.jobs_folder
+        if not folder:
             self._ui(messagebox.showwarning, "Generate",
-                     "Local Jobsite Package Folder is not configured.")
+                     "Jobs folder is not configured.")
             return
 
-        success, errors = 0, []
-        for job_id in job_ids:
-            job_path = os.path.join(target, job_id)
+        n = len(job_ids)
+        self._ui(self._set_progress, "Generating…", 0, n)
+        success_ids, errors = [], []
+        for i, job_id in enumerate(job_ids, 1):
+            job_path = os.path.join(folder, job_id)
             try:
                 self._engine.generate_pdf(job_path)
                 qty = JobManager._read_qty_from_summary(
@@ -2166,12 +2322,12 @@ class BuildersQRLabelsApp:
                 job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
                 job.sticker_status = "Completed"
                 job.sticker_qty    = qty
-                if job.cloud_status in ("Pending", "CSV Only", "Incomplete"):
+                if job.cloud_status not in ("Uploaded", "Cloud Only"):
                     job.cloud_status   = "Local"
-                    job.cloud_progress = "50%"
+                    job.cloud_progress = "66%"
                 job.last_updated = datetime.now().isoformat(timespec="seconds")
                 self._db.upsert_job(job)
-                success += 1
+                success_ids.append(job_id)
                 _j = job  # capture for lambda
                 self._ui(lambda j=_j: self._update_job_row(j))
             except Exception as exc:
@@ -2184,14 +2340,15 @@ class BuildersQRLabelsApp:
                 self._db.upsert_job(err_job)
                 _ej = err_job
                 self._ui(lambda j=_ej: self._update_job_row(j))
+            self._ui(self._set_progress, f"Generating {i} of {n}…", i, n)
 
+        self._ui(self._clear_progress)
         self._ui(self._update_statusbar)
-        msg = f"Generated {success} job(s) successfully."
         if errors:
-            msg += f"\n\nErrors ({len(errors)}):\n" + "\n".join(errors)
+            msg = f"Generated {len(success_ids)} job(s).\n\nErrors ({len(errors)}):\n" + "\n".join(errors)
             self._ui(messagebox.showwarning, "Generate Complete", msg)
-        else:
-            self._ui(messagebox.showinfo, "Generate Complete", msg)
+        elif success_ids:
+            self._ui(self._prompt_upload_after_generate, success_ids)
 
     def _revalidate_task(self, job_id: str) -> None:
         try:
@@ -2211,8 +2368,10 @@ class BuildersQRLabelsApp:
         if self._cloud is None:
             self._ui(messagebox.showwarning, "Upload", "Cloud provider is not available.")
             return
+        n = len(job_ids)
+        self._ui(self._set_progress, "Uploading…", 0, n)
         success, errors = 0, []
-        for job_id in job_ids:
+        for i, job_id in enumerate(job_ids, 1):
             try:
                 self._manager.upload_job(job_id, self._cloud)
                 job = self._job_by_id(job_id) or JobInfo(job_id=job_id)
@@ -2233,6 +2392,8 @@ class BuildersQRLabelsApp:
                 self._db.upsert_job(err_job)
                 _ej = err_job
                 self._ui(lambda j=_ej: self._update_job_row(j))
+            self._ui(self._set_progress, f"Uploading {i} of {n}…", i, n)
+        self._ui(self._clear_progress)
         self._ui(self._update_statusbar)
         msg = f"Uploaded {success} job(s) successfully."
         if errors:
@@ -2303,6 +2464,16 @@ class BuildersQRLabelsApp:
 
     # ── Status bar ────────────────────────────────────────────────────────────
 
+    def _set_progress(self, text: str, value: int, maximum: int) -> None:
+        """Update the status bar progress indicator. Must run on the main thread."""
+        self._lbl_progress.config(text=text)
+        self._progress_bar.config(maximum=max(maximum, 1), value=value)
+
+    def _clear_progress(self) -> None:
+        """Reset the progress indicator after a task completes."""
+        self._lbl_progress.config(text="")
+        self._progress_bar.config(value=0)
+
     def _update_statusbar(self) -> None:
         auth = False
         try:
@@ -2358,12 +2529,12 @@ class SettingsDialog:
     """
     Modal settings dialog.  Three tabbed sections:
       Cloud   — provider radio, Dropbox credentials + auth, OneDrive credentials + auth
-      Paths   — DB path, Watch/Target/Log folders, auto-refresh interval
+      Paths   — DB path, Jobs/Log folders, auto-refresh interval
       Company — company name and address
 
     On Save:
       Per-machine settings (cloud credentials, db_path, company) → config.json
-      Shared settings (watch_folder, target_folder, log_path, auto_refresh_seconds)
+      Shared settings (jobs_folder, log_path, auto_refresh_seconds)
         → DB settings table (propagated to all machines on next auto-refresh)
     """
 
@@ -2385,8 +2556,7 @@ class SettingsDialog:
         self._od_client_var  = tk.StringVar(value=config.onedrive_client_id)
         self._od_tenant_var  = tk.StringVar(value=config.onedrive_tenant_id)
         self._db_path_var    = tk.StringVar(value=config.db_path)
-        self._watch_var      = tk.StringVar(value=db.get_setting("watch_folder"))
-        self._target_var     = tk.StringVar(value=db.get_setting("target_folder"))
+        self._jobs_var       = tk.StringVar(value=db.get_setting("jobs_folder") or db.get_setting("target_folder"))
         self._log_var        = tk.StringVar(value=db.get_setting("log_path"))
         self._refresh_var    = tk.StringVar(value=db.get_setting("auto_refresh_seconds", "30"))
         self._company_var    = tk.StringVar(value=config.company_name)
@@ -2494,11 +2664,9 @@ class SettingsDialog:
             padx=8, pady=6,
         )
         folders_lf.pack(fill=tk.X, pady=(0, 8))
-        self._add_browse_entry(folders_lf, "Watch Folder:",  self._watch_var,  row=0,
+        self._add_browse_entry(folders_lf, "Jobs Folder:",   self._jobs_var,   row=0,
                                browse_fn=self._browse_dir)
-        self._add_browse_entry(folders_lf, "Local Jobsite Package Folder:", self._target_var, row=1,
-                               browse_fn=self._browse_dir)
-        self._add_browse_entry(folders_lf, "Log Path:",      self._log_var,    row=2,
+        self._add_browse_entry(folders_lf, "Log Path:",      self._log_var,    row=1,
                                browse_fn=self._browse_log)
 
         # Auto-refresh spinbox
@@ -2831,8 +2999,7 @@ class SettingsDialog:
             self._db.reconnect(new_path)
 
         # Shared settings → DB settings table
-        self._db.set_setting("watch_folder",         self._watch_var.get().strip())
-        self._db.set_setting("target_folder",        self._target_var.get().strip())
+        self._db.set_setting("jobs_folder",          os.path.normpath(self._jobs_var.get().strip()) if self._jobs_var.get().strip() else "")
         self._db.set_setting("log_path",             self._log_var.get().strip())
         self._db.set_setting("auto_refresh_seconds", str(refresh_secs))
 

@@ -1,0 +1,6 @@
+jobnumber,trsname,trusstype,batch,customer,jobname,qty,ply
+208100-004,TR01,Common Truss,H01,Blue Ridge Builders,Spruce Hill Estates,11,1
+208100-004,TR02,Common Truss,H01,Blue Ridge Builders,Spruce Hill Estates,11,1
+208100-004,TR03,Common Truss,H01,Blue Ridge Builders,Spruce Hill Estates,8,1
+208100-004,HP01,Hip Truss,H01,Blue Ridge Builders,Spruce Hill Estates,7,2
+208100-004,GB01,Gable End,H01,Blue Ridge Builders,Spruce Hill Estates,2,1
